@@ -11,7 +11,7 @@ const AUTH = "https://login.microsoftonline.com/consumers/oauth2/v2.0";
 const GRAPH = "https://graph.microsoft.com/v1.0";
 const SCOPE = "Files.ReadWrite offline_access User.Read";
 const REDIRECT = new URL("./", location.href).href;
-const VERSION = "1.2";
+const VERSION = "1.3";
 const AUDIO_EXT = /\.(wav|mp3|aif|aiff|flac|m4a)$/i;
 
 const $ = (id) => document.getElementById(id);
@@ -250,6 +250,7 @@ function renderFilters() {
   const box = $("filters");
   box.replaceChildren();
   if (!catalogue) { box.hidden = true; return; }
+  box.hidden = false;
   const songs = catalogue.songs || [];
   const count = (pred) => songs.filter(pred).length;
   const groups = [
@@ -259,14 +260,16 @@ function renderFilters() {
   ];
   // Un filtre qui n'existe plus dans le catalogue est oublié.
   for (const [key, values] of groups) if (filter[key] && !values.includes(filter[key])) delete filter[key];
-  const all = el("button", !filter.q && !filter.y && !filter.t ? "on" : "", "Tout");
-  all.addEventListener("click", () => setFilter({}));
-  box.append(all);
+  const off = el("button", offlineView ? "on" : "", "⬇ Sur l'iPhone");
+  off.addEventListener("click", () => { offlineView = !offlineView; renderFilters(); render(); window.scrollTo(0, 0); });
+  const all = el("button", !offlineView && !filter.q && !filter.y && !filter.t ? "on" : "", "Tout");
+  all.addEventListener("click", () => { offlineView = false; setFilter({}); });
+  box.append(off, all);
   for (const [key, values] of groups) {
     if (!values.length) continue;
     box.append(el("span", "sep"));
     for (const v of values) {
-      const b = el("button", filter[key] === v ? "on" : "");
+      const b = el("button", !offlineView && filter[key] === v ? "on" : "");
       const color = key === "t" && catalogue.tags[v];
       if (color) {
         const dot = el("span", "dot");
@@ -274,7 +277,10 @@ function renderFilters() {
         b.append(dot);
       }
       b.append(String(v));
-      b.addEventListener("click", () => setFilter({ ...filter, [key]: filter[key] === v ? undefined : v }));
+      b.addEventListener("click", () => {
+        offlineView = false;
+        setFilter({ ...filter, [key]: filter[key] === v ? undefined : v });
+      });
       box.append(b);
     }
   }
@@ -332,6 +338,7 @@ function bestFile(song) {
 function render() {
   const q = $("q").value;
   $("clear").hidden = !q;
+  if (offlineView) { renderOffline(); return; }
   const list = $("results");
   list.replaceChildren();
   $("live").replaceChildren();
@@ -347,6 +354,7 @@ function render() {
   if (active) setStatus(`${found.length} morceau${found.length > 1 ? "x" : ""} · ${active}`);
   else if (!q.trim()) setStatus(statusText() + " · derniers bounces");
   else setStatus(statusText());
+  markDownloaded();
 }
 
 function el(tag, cls, text) {
@@ -462,6 +470,7 @@ function fillFiles(v) {
   const stems = v.s.map(fileObj);
   $("stems").replaceChildren(...stems.map((f) => fileRow(f, `${title} (stems)`)));
   $("stems-title").hidden = !stems.length;
+  markDownloaded();
 }
 
 function fileRow(file, title, queue = [file]) {
@@ -494,6 +503,7 @@ async function send(file, title, btn) {
     pending = { url, title, file };
     $("share-name").textContent = file.name;
     $("share-native").hidden = !navigator.share;
+    $("share-dl").hidden = !!file.dir;
     $("share").hidden = false;
   } catch (e) {
     if (e instanceof NeedLogin) return showLogin();
@@ -577,6 +587,177 @@ function sendMail() {
   const params = `subject=${encodeURIComponent($("mail-subject").value)}&body=${encodeURIComponent($("mail-body").value)}`;
   location.href = `mailto:${to.map(encodeURIComponent).join(",")}?${params}`;
   history.back();
+}
+
+// --- Téléchargement sur l'iPhone ----------------------------------------------------
+// Le fichier est gardé dans l'app (écoute hors ligne, sans réseau) et peut être
+// enregistré dans Fichiers via la feuille de partage de l'iPhone.
+
+const MIME = { wav: "audio/wav", mp3: "audio/mpeg", m4a: "audio/mp4", aif: "audio/aiff",
+               aiff: "audio/aiff", flac: "audio/flac", zip: "application/zip" };
+const ext = (name) => (name.split(".").pop() || "").toLowerCase();
+const fileKey = (f) => f.id || f.p;
+
+let dbPromise = null;
+function db() {
+  dbPromise ??= new Promise((resolve, reject) => {
+    const req = indexedDB.open("sirob", 1);
+    req.onupgradeneeded = () => req.result.createObjectStore("files", { keyPath: "key" });
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return dbPromise;
+}
+async function idb(mode, fn) {
+  const d = await db();
+  return new Promise((resolve, reject) => {
+    const tx = d.transaction("files", mode);
+    const req = fn(tx.objectStore("files"));
+    tx.oncomplete = () => resolve(req && req.result);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error("Stockage plein"));
+  });
+}
+const localGet = (key) => idb("readonly", (s) => s.get(key)).catch(() => null);
+const localPut = (rec) => idb("readwrite", (s) => s.put(rec));
+const localDel = (key) => idb("readwrite", (s) => s.delete(key));
+const localAll = () => idb("readonly", (s) => s.getAll()).catch(() => []);
+
+let downloaded = new Set();     // clés des fichiers gardés sur l'iPhone
+async function refreshDownloaded() {
+  const all = await localAll();
+  downloaded = new Set(all.map((r) => r.key));
+  return all;
+}
+
+const fmtSize = (n) => n >= 1e9 ? `${(n / 1e9).toFixed(1)} Go` : `${Math.max(1, Math.round(n / 1e6))} Mo`;
+
+let dlFile = null;       // {file, title, blob}
+let dlAbort = null;
+
+async function download(file, title) {
+  closeShare();
+  dlFile = { file, title, blob: null };
+  $("dl-name").textContent = file.name;
+  $("dl").hidden = false;
+  const local = await localGet(fileKey(file));
+  if (local) return dlReady(local.blob, true);
+  dlProgress(0, "Téléchargement…");
+  dlAbort = new AbortController();
+  try {
+    const item = await graph(itemUrl(file).replace(/:$/, ""));
+    const resp = await fetch(item["@microsoft.graph.downloadUrl"], { signal: dlAbort.signal });
+    if (!resp.ok) throw new Error(`Erreur OneDrive ${resp.status}`);
+    const total = Number(resp.headers.get("content-length")) || item.size || 0;
+    const reader = resp.body.getReader();
+    const chunks = [];
+    let got = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      got += value.length;
+      dlProgress(total ? got / total : 0, `${fmtSize(got)}${total ? " / " + fmtSize(total) : ""}`);
+    }
+    const blob = new Blob(chunks, { type: MIME[ext(file.name)] || "application/octet-stream" });
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+    try {
+      await localPut({ key: fileKey(file), name: file.name, title, p: file.p, id: file.id || null,
+                       m: file.m || 0, size: blob.size, savedAt: Date.now(), blob });
+      downloaded.add(fileKey(file));
+      markDownloaded();
+    } catch {
+      toast("iPhone plein : fichier non gardé hors ligne, mais tu peux l'enregistrer dans Fichiers");
+    }
+    dlReady(blob, false);
+  } catch (e) {
+    if (e instanceof NeedLogin) return showLogin();
+    if (e.name === "AbortError") return;
+    dlProgress(0, "Échec : " + e.message);
+  } finally {
+    dlAbort = null;
+  }
+}
+
+function dlProgress(ratio, text) {
+  $("dl-bar").value = ratio;
+  $("dl-bar").hidden = false;
+  $("dl-info").textContent = text;
+  $("dl-save").hidden = true;
+}
+
+function dlReady(blob, already) {
+  dlFile.blob = blob;
+  $("dl-bar").hidden = true;
+  $("dl-info").textContent = `${already ? "Déjà sur l'iPhone" : "Téléchargé"} · ${fmtSize(blob.size)} · écoute hors ligne ✓`;
+  $("dl-save").hidden = false;
+}
+
+async function saveToFiles() {
+  const { file, blob } = dlFile;
+  const f = new File([blob], file.name, { type: blob.type });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [f] })) {
+      await navigator.share({ files: [f] });     // « Enregistrer dans Fichiers » dans la liste
+      return closeDl();
+    }
+  } catch (e) {
+    if (e.name === "AbortError") return;
+  }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = file.name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60_000);
+}
+
+function closeDl() {
+  if (dlAbort) dlAbort.abort();
+  $("dl").hidden = true;
+}
+
+/** Petit ⬇ sur les lignes des fichiers déjà gardés sur l'iPhone. */
+function markDownloaded() {
+  document.querySelectorAll(".play[data-key]").forEach((b) => {
+    b.closest(".row").classList.toggle("saved", downloaded.has(b.dataset.key));
+  });
+}
+
+// Liste « Sur l'iPhone » : fichiers téléchargés, lisibles sans réseau.
+let offlineView = false;
+
+async function renderOffline() {
+  const all = (await refreshDownloaded()).sort((a, b) => b.savedAt - a.savedAt);
+  const list = $("results");
+  list.replaceChildren();
+  $("live").replaceChildren();
+  $("more").hidden = true;
+  const q = norm($("q").value).trim();
+  const shown = all.filter((r) => !q || norm(`${r.title} ${r.name}`).includes(q));
+  for (const r of shown) {
+    const file = { p: r.p, id: r.id || undefined, name: r.name, m: r.m };
+    const li = el("li", "row saved");
+    const main = el("div", "row-main");
+    main.append(el("div", "row-title", stripExt(r.name)),
+                el("div", "row-sub", `${r.title && r.title !== stripExt(r.name) ? r.title + " · " : ""}${fmtSize(r.size)}`));
+    const del = el("button", "icon-btn", "✕");
+    del.setAttribute("aria-label", "Retirer de l'iPhone");
+    del.addEventListener("click", async () => {
+      if (!confirm(`Retirer « ${r.name} » de l'iPhone ?`)) return;
+      if (playing === r.key) stopPlay();
+      await localDel(r.key);
+      renderOffline();
+    });
+    li.append(playButton(file, shown.map((x) => ({ p: x.p, id: x.id || undefined, name: x.name })), r.title), main,
+              sendButton(file, r.title || stripExt(r.name)), del);
+    list.append(li);
+  }
+  if (!shown.length) {
+    list.append(el("li", "empty", all.length ? "Aucun fichier téléchargé ne correspond."
+      : "Rien sur l'iPhone pour l'instant. Touche Envoyer > « Télécharger sur l'iPhone », ou ⬇ dans le lecteur."));
+  }
+  const total = all.reduce((n, r) => n + r.size, 0);
+  setStatus(`${all.length} fichier${all.length > 1 ? "s" : ""} sur l'iPhone · ${fmtSize(total)} · écoute sans réseau`);
 }
 
 // --- Écoute -------------------------------------------------------------------------
@@ -667,9 +848,17 @@ async function togglePlay(file, queue = [file], title = "") {
   fillNow();
   syncPlayButtons();
   try {
-    const item = await graph(itemUrl(file).replace(/:$/, ""));
+    const local = await localGet(key);
+    let src;
+    if (local) {
+      src = URL.createObjectURL(local.blob);     // copie sur l'iPhone : marche sans réseau
+    } else {
+      const item = await graph(itemUrl(file).replace(/:$/, ""));
+      src = item["@microsoft.graph.downloadUrl"];
+    }
     if (playing !== key) return;
-    audio.src = item["@microsoft.graph.downloadUrl"];
+    if (audio.src.startsWith("blob:")) URL.revokeObjectURL(audio.src);
+    audio.src = src;
     $("play-name").textContent = file.name;
     mediaSession();
     await audio.play();
@@ -805,6 +994,10 @@ function wire() {
   $("share-mail").addEventListener("click", openMail);
   $("share-copy").addEventListener("click", copyLink);
   $("share-close").addEventListener("click", closeShare);
+  $("share-dl").addEventListener("click", () => download(pending.file, pending.title));
+  $("now-dl").addEventListener("click", () => now && download(now.file, now.title || stripExt(now.file.name)));
+  $("dl-save").addEventListener("click", saveToFiles);
+  $("dl-close").addEventListener("click", closeDl);
   $("share").addEventListener("click", (e) => { if (e.target.id === "share") closeShare(); });
   $("play-toggle").addEventListener("click", () => { const a = $("audio"); a.paused ? a.play() : a.pause(); });
   $("play-close").addEventListener("click", stopPlay);
@@ -839,6 +1032,7 @@ async function start() {
   if (!store.get("tok")) return showLogin();
   show("search");
   buildEntries();
+  await refreshDownloaded();
   renderFilters();
   render();
   loadCatalogue();

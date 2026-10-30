@@ -91,7 +91,20 @@
       <button id="share-native" class="primary big">Partager… <span class="small">WhatsApp, SMS, AirDrop</span></button>
       <button id="share-mail" class="ghost big">✉️ Envoyer par mail</button>
       <button id="share-copy" class="ghost big">Copier le lien</button>
+      <button id="share-dl" class="ghost big">⬇ Télécharger sur l'iPhone</button>
       <button id="share-close" class="ghost">Annuler</button>
+    </div>
+  </div>
+
+  <!-- Téléchargement sur l'iPhone -->
+  <div id="dl" class="overlay" hidden>
+    <div class="share-box">
+      <p class="share-title">Télécharger sur l'iPhone</p>
+      <p id="dl-name" class="dim small"></p>
+      <progress id="dl-bar" class="dl-bar" max="1" value="0"></progress>
+      <p id="dl-info" class="small"></p>
+      <button id="dl-save" class="primary big" hidden>Enregistrer dans Fichiers…</button>
+      <button id="dl-close" class="ghost">Fermer</button>
     </div>
   </div>
 
@@ -156,7 +169,10 @@
         <svg viewBox="0 0 24 24" class="ic"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg>
       </button>
     </div>
-    <button id="now-send" class="primary big">Envoyer ce fichier</button>
+    <div class="now-actions">
+      <button id="now-dl" class="ghost big">⬇ Télécharger</button>
+      <button id="now-send" class="primary big">Envoyer</button>
+    </div>
   </section>
   <audio id="audio" preload="none" playsinline></audio>
 
