@@ -82,6 +82,6 @@ fois : **Réglages > Apps > Mail > Comptes > Ajouter un compte > Autre > Ajouter
 - **Catalogue à jour** : il est réécrit par le Mac à chaque scan ou nouveau bounce détecté. La date
   du dernier envoi par le Mac est affichée sous la barre de recherche.
 - **Écouter avant d'envoyer** : ▶ lit le fichier en streaming depuis OneDrive.
-- **Mise à jour de l'app** : remplacer les fichiers dans le dépôt GitHub (Add file > Upload files).
-  L'iPhone prend la nouvelle version à la prochaine ouverture.
+- **Mise à jour de l'app** : dans le dépôt GitHub, Add file > Upload files, glisse les fichiers modifiés, Commit changes.
+  L'iPhone prend la nouvelle version à la prochaine ouverture (ferme l'app et rouvre-la).
 - **Emplacement du catalogue** : modifiable dans ⚙︎ si tu déplaces le dossier.

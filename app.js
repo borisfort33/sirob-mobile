@@ -11,7 +11,7 @@ const AUTH = "https://login.microsoftonline.com/consumers/oauth2/v2.0";
 const GRAPH = "https://graph.microsoft.com/v1.0";
 const SCOPE = "Files.ReadWrite offline_access User.Read";
 const REDIRECT = new URL("./", location.href).href;
-const VERSION = "1.0";
+const VERSION = "1.1";
 const AUDIO_EXT = /\.(wav|mp3|aif|aiff|flac|m4a)$/i;
 
 const $ = (id) => document.getElementById(id);
@@ -201,6 +201,7 @@ async function loadCatalogue(force = false) {
     catalogue = data;
     store.set("catalogue", data);
     buildEntries();
+    renderFilters();
     render();
   } catch (e) {
     if (e instanceof NeedLogin) return showLogin();
@@ -231,14 +232,74 @@ function setStatus(text) { $("status").textContent = text; }
 
 // --- Recherche ----------------------------------------------------------------------
 
+// --- Menus : filtres du Mac (SIRØB, M6, Ghost…), années, tags ---------------------
+// Un choix par groupe ; les groupes se combinent (ex. M6 + 2025).
+
+let filter = store.get("filter", {});   // {q: "M6", y: 2025, t: "Rouge"}
+
+function passes(e) {
+  if (!filter.q && !filter.y && !filter.t) return true;
+  if (!e.song) return false;            // exports isolés : seulement sans filtre
+  const s = e.song;
+  return (!filter.q || (s.q || []).includes(filter.q))
+    && (!filter.y || s.y === filter.y)
+    && (!filter.t || (s.t || []).includes(filter.t));
+}
+
+function renderFilters() {
+  const box = $("filters");
+  box.replaceChildren();
+  if (!catalogue) { box.hidden = true; return; }
+  const songs = catalogue.songs || [];
+  const count = (pred) => songs.filter(pred).length;
+  const groups = [
+    ["q", (catalogue.filters || []).filter((n) => count((s) => (s.q || []).includes(n)))],
+    ["y", [...new Set(songs.map((s) => s.y).filter(Boolean))].sort((a, b) => b - a)],
+    ["t", Object.keys(catalogue.tags || {}).filter((n) => count((s) => (s.t || []).includes(n)))],
+  ];
+  // Un filtre qui n'existe plus dans le catalogue est oublié.
+  for (const [key, values] of groups) if (filter[key] && !values.includes(filter[key])) delete filter[key];
+  const all = el("button", !filter.q && !filter.y && !filter.t ? "on" : "", "Tout");
+  all.addEventListener("click", () => setFilter({}));
+  box.append(all);
+  for (const [key, values] of groups) {
+    if (!values.length) continue;
+    box.append(el("span", "sep"));
+    for (const v of values) {
+      const b = el("button", filter[key] === v ? "on" : "");
+      const color = key === "t" && catalogue.tags[v];
+      if (color) {
+        const dot = el("span", "dot");
+        dot.style.background = color;
+        b.append(dot);
+      }
+      b.append(String(v));
+      b.addEventListener("click", () => setFilter({ ...filter, [key]: filter[key] === v ? undefined : v }));
+      box.append(b);
+    }
+  }
+  box.hidden = false;
+}
+
+function setFilter(f) {
+  filter = Object.fromEntries(Object.entries(f).filter(([, v]) => v !== undefined));
+  store.set("filter", filter);
+  renderFilters();
+  render();
+  window.scrollTo(0, 0);
+}
+
 function search(q) {
   const tokens = norm(q).split(/\s+/).filter(Boolean);
+  const filtered = filter.q || filter.y || filter.t;
   if (!tokens.length) {
-    return entries.filter((e) => e.count).sort((a, b) => b.last - a.last).slice(0, 40);
+    return entries.filter((e) => passes(e) && (filtered || e.count))
+      .sort((a, b) => b.last - a.last).slice(0, filtered ? 400 : 40);
   }
   const nq = tokens.join(" ");
   const out = [];
   for (const e of entries) {
+    if (!passes(e)) continue;
     if (!tokens.every((t) => e.hay.includes(t))) continue;
     const rank = e.title.startsWith(nq) ? 0 : e.title.includes(nq) ? 1
       : tokens.every((t) => e.title.includes(t)) ? 2 : 3;
@@ -282,7 +343,9 @@ function render() {
   }
   $("more").hidden = !q.trim();
   $("live-btn").textContent = `Chercher « ${q.trim()} » dans tout OneDrive`;
-  if (!q.trim()) setStatus(statusText() + " · derniers bounces");
+  const active = [filter.q, filter.y, filter.t].filter(Boolean).join(" · ");
+  if (active) setStatus(`${found.length} morceau${found.length > 1 ? "x" : ""} · ${active}`);
+  else if (!q.trim()) setStatus(statusText() + " · derniers bounces");
   else setStatus(statusText());
 }
 
@@ -562,6 +625,12 @@ async function togglePlay(file) {
   }
 }
 
+function clock(sec) {
+  if (!isFinite(sec) || sec < 0) return "0:00";
+  const m = Math.floor(sec / 60);
+  return `${m}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
+}
+
 function stopPlay() {
   const audio = $("audio");
   audio.pause();
@@ -649,8 +718,25 @@ function wire() {
   $("play-close").addEventListener("click", stopPlay);
   const audio = $("audio");
   for (const ev of ["play", "pause", "ended"]) audio.addEventListener(ev, syncPlayButtons);
-  audio.addEventListener("timeupdate", () => {
-    $("play-pos").value = audio.duration ? audio.currentTime / audio.duration : 0;
+  // Barre de lecture : on peut la faire glisser pour avancer ou reculer.
+  const pos = $("play-pos");
+  let seeking = false;
+  const paint = (ratio) => pos.style.setProperty("--p", `${(ratio * 100).toFixed(2)}%`);
+  const showTime = () => {
+    const d = audio.duration;
+    if (!seeking) {
+      pos.value = d ? Math.round((audio.currentTime / d) * 1000) : 0;
+      paint(d ? audio.currentTime / d : 0);
+    }
+    $("play-time").textContent = clock(seeking && d ? (pos.value / 1000) * d : audio.currentTime);
+    $("play-dur").textContent = clock(d);
+  };
+  for (const ev of ["timeupdate", "loadedmetadata", "durationchange", "emptied"]) audio.addEventListener(ev, showTime);
+  pos.addEventListener("input", () => { seeking = true; paint(pos.value / 1000); showTime(); });
+  pos.addEventListener("change", () => {
+    if (audio.duration) audio.currentTime = (pos.value / 1000) * audio.duration;
+    seeking = false;
+    showTime();
   });
   // Retour dans l'app après un moment : catalogue rafraîchi si le Mac l'a réécrit.
   document.addEventListener("visibilitychange", () => {
@@ -671,6 +757,7 @@ async function start() {
   if (!store.get("tok")) return showLogin();
   show("search");
   buildEntries();
+  renderFilters();
   render();
   loadCatalogue();
   rememberAccount();

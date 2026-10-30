@@ -105,6 +105,10 @@ button { cursor: pointer; }
   padding: 7px 13px; font-size: 14px;
 }
 .chips button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.filters { margin: -2px -16px 4px; padding: 2px 16px 8px; }
+.filters button { font-size: 14px; padding: 6px 12px; }
+.filters .sep { flex: none; width: 1px; background: var(--border); margin: 4px 2px; }
+.filters .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
 .empty { color: var(--dim); padding: 12px 4px; font-size: 14px; }
 
 /* Réglages */
@@ -152,9 +156,24 @@ button { cursor: pointer; }
 .player .icon-btn { color: var(--accent); font-size: 16px; }
 .player-info { flex: 1; min-width: 0; }
 .player-info span { display: block; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.player-info progress { width: 100%; height: 3px; appearance: none; -webkit-appearance: none; border: 0; display: block; margin-top: 5px; }
-.player-info progress::-webkit-progress-bar { background: var(--border); border-radius: 2px; }
-.player-info progress::-webkit-progress-value { background: var(--accent); border-radius: 2px; }
+.seek { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.time { font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; min-width: 30px; }
+.time:last-child { text-align: right; }
+.seek input[type=range] {
+  flex: 1; min-width: 0; height: 28px; margin: 0; background: transparent;
+  -webkit-appearance: none; appearance: none; --p: 0%;
+}
+.seek input[type=range]::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent) var(--p), var(--border) var(--p));
+}
+.seek input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--accent); margin-top: -6px; border: 0;
+}
+.seek input[type=range]::-moz-range-track { height: 4px; border-radius: 2px; background: var(--border); }
+.seek input[type=range]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--accent); }
+.seek input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--accent); border: 0; }
 
 .toast {
   position: fixed; left: 50%; transform: translateX(-50%); z-index: 30;

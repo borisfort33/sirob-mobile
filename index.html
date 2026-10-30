@@ -36,6 +36,7 @@
       </div>
       <button id="settings-btn" class="icon-btn" aria-label="Réglages">⚙︎</button>
     </header>
+    <div id="filters" class="chips filters" hidden></div>
     <p id="status" class="status"></p>
     <ul id="results" class="list"></ul>
     <div id="more" class="more" hidden>
@@ -120,7 +121,11 @@
     <button id="play-toggle" class="icon-btn">❚❚</button>
     <div class="player-info">
       <span id="play-name"></span>
-      <progress id="play-pos" max="1" value="0"></progress>
+      <div class="seek">
+        <span id="play-time" class="time">0:00</span>
+        <input id="play-pos" type="range" min="0" max="1000" step="1" value="0" aria-label="Position">
+        <span id="play-dur" class="time">0:00</span>
+      </div>
     </div>
     <button id="play-close" class="icon-btn">✕</button>
   </div>
