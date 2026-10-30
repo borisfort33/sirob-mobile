@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>SIRØB Mobile</title>
+  <meta name="theme-color" content="#16181d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SIRØB">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Connexion -->
+  <section id="login" class="screen" hidden>
+    <div class="login-box">
+      <img src="icons/icon-192.png" alt="" class="logo">
+      <h1>SIRØB Mobile</h1>
+      <p>Cherche un morceau, envoie son bounce en lecture seule.</p>
+      <button id="login-btn" class="primary big">Se connecter à OneDrive</button>
+      <p id="login-error" class="error" hidden></p>
+    </div>
+  </section>
+
+  <!-- Recherche -->
+  <section id="search" class="screen" hidden>
+    <header class="top">
+      <div class="searchbar">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+        <input id="q" type="search" placeholder="Titre, artiste, client…" autocomplete="off"
+               autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
+        <button id="clear" class="icon-btn" aria-label="Effacer" hidden>✕</button>
+      </div>
+      <button id="settings-btn" class="icon-btn" aria-label="Réglages">⚙︎</button>
+    </header>
+    <p id="status" class="status"></p>
+    <ul id="results" class="list"></ul>
+    <div id="more" class="more" hidden>
+      <button id="live-btn" class="ghost">Chercher dans tout OneDrive</button>
+    </div>
+    <ul id="live" class="list"></ul>
+  </section>
+
+  <!-- Morceau -->
+  <section id="song" class="screen sheet" hidden>
+    <header class="top">
+      <button id="back" class="icon-btn back" aria-label="Retour">‹</button>
+      <div class="song-head">
+        <h2 id="song-title"></h2>
+        <p id="song-sub" class="dim"></p>
+      </div>
+    </header>
+    <div id="variants" class="chips" hidden></div>
+    <h3 class="section">Masters &amp; bounces</h3>
+    <ul id="bounces" class="list files"></ul>
+    <h3 class="section" id="stems-title">Stems</h3>
+    <ul id="stems" class="list files"></ul>
+  </section>
+
+  <!-- Réglages -->
+  <section id="settings" class="screen sheet" hidden>
+    <header class="top">
+      <button id="settings-back" class="icon-btn back" aria-label="Retour">‹</button>
+      <div class="song-head"><h2>Réglages</h2></div>
+    </header>
+    <div class="card">
+      <p id="cat-info"></p>
+      <button id="reload" class="ghost">Actualiser le catalogue</button>
+    </div>
+    <div class="card">
+      <label for="cat-path">Emplacement du catalogue dans OneDrive</label>
+      <input id="cat-path" type="text" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <p class="dim small">Écrit par l'app du Mac à chaque scan. Par défaut : SIROB Browser/catalogue.json</p>
+    </div>
+    <div class="card">
+      <p id="account" class="dim"></p>
+      <button id="logout" class="ghost danger">Se déconnecter</button>
+    </div>
+    <p class="dim small center" id="version"></p>
+  </section>
+
+  <!-- Envoi : partage iOS, mail ou copie -->
+  <div id="share" class="overlay" hidden>
+    <div class="share-box">
+      <p class="share-title" id="share-title">Envoyer</p>
+      <p id="share-name" class="dim small"></p>
+      <button id="share-native" class="primary big">Partager… <span class="small">WhatsApp, SMS, AirDrop</span></button>
+      <button id="share-mail" class="ghost big">✉️ Envoyer par mail</button>
+      <button id="share-copy" class="ghost big">Copier le lien</button>
+      <button id="share-close" class="ghost">Annuler</button>
+    </div>
+  </div>
+
+  <!-- Mail, comme sur le Mac -->
+  <section id="mail" class="screen sheet" hidden>
+    <header class="top">
+      <button id="mail-back" class="icon-btn back" aria-label="Retour">‹</button>
+      <div class="song-head"><h2>Envoyer par mail</h2></div>
+    </header>
+    <div class="card form">
+      <label for="mail-to">À</label>
+      <input id="mail-to" type="text" inputmode="email" autocomplete="email" autocapitalize="off"
+             spellcheck="false" placeholder="adresse@exemple.com" list="mail-contacts">
+      <datalist id="mail-contacts"></datalist>
+      <div id="mail-chips" class="chips"></div>
+      <label for="mail-subject">Objet</label>
+      <input id="mail-subject" type="text">
+      <label for="mail-body">Message</label>
+      <textarea id="mail-body" rows="9"></textarea>
+    </div>
+    <button id="mail-send" class="primary big">Ouvrir dans Mail</button>
+    <p class="dim small center">Mail s'ouvre avec tout pré-rempli : il reste à appuyer sur Envoyer.</p>
+  </section>
+
+  <!-- Lecteur -->
+  <div id="player" class="player" hidden>
+    <button id="play-toggle" class="icon-btn">❚❚</button>
+    <div class="player-info">
+      <span id="play-name"></span>
+      <progress id="play-pos" max="1" value="0"></progress>
+    </div>
+    <button id="play-close" class="icon-btn">✕</button>
+  </div>
+  <audio id="audio" preload="none" playsinline></audio>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
