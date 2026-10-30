@@ -221,3 +221,14 @@ button { cursor: pointer; }
 .row.saved .row-title::before { content: "⬇ "; color: var(--accent); font-size: 12px; }
 .now-actions { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; }
 .now-actions .big { padding: 14px 8px; }
+
+/* Statut / deadline / payé / client (remplis sur le Mac) */
+.prod { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+.prod.big { margin: 0 0 8px; gap: 7px; }
+.prod span { font-size: 11px; line-height: 1; padding: 4px 7px; border-radius: 7px; white-space: nowrap;
+             background: var(--panel); border: 1px solid var(--border); color: var(--dim); }
+.prod.big span { font-size: 13px; padding: 6px 9px; }
+.prod .pill-st { color: var(--c); border-color: var(--c); font-weight: 700; }
+.prod .pill-dl.urgent { color: #ff6b6b; border-color: #ff6b6b; font-weight: 600; }
+.prod .pill-pay { color: #ffc048; border-color: #6b5320; }
+.prod .pill-pay.ok { color: #4cd964; border-color: #2a5e33; }

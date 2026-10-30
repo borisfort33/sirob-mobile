@@ -11,7 +11,7 @@ const AUTH = "https://login.microsoftonline.com/consumers/oauth2/v2.0";
 const GRAPH = "https://graph.microsoft.com/v1.0";
 const SCOPE = "Files.ReadWrite offline_access User.Read";
 const REDIRECT = new URL("./", location.href).href;
-const VERSION = "1.3";
+const VERSION = "1.4";
 const AUDIO_EXT = /\.(wav|mp3|aif|aiff|flac|m4a)$/i;
 
 const $ = (id) => document.getElementById(id);
@@ -364,6 +364,45 @@ function el(tag, cls, text) {
   return n;
 }
 
+// --- Statut, client, deadline, payé : affichés seulement s'ils sont remplis sur le Mac ---
+
+const STATUS_COLORS = { "Idée": "#b67ce8", "Active": "#4aa3ff", "Mix": "#ff9f43", "Done": "#4cd964" };
+
+function daysLeft(iso) {
+  const d = new Date(iso + "T00:00:00");
+  if (isNaN(d)) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((d - today) / 86_400_000);
+}
+
+/** Pastilles de prod d'un morceau ([] si rien n'a été renseigné sur le Mac). */
+function prodBadges(info, long = false) {
+  if (!info) return [];
+  const out = [];
+  if (info.st) {
+    const b = el("span", "pill-st", info.st);
+    b.style.setProperty("--c", STATUS_COLORS[info.st] || "var(--dim)");
+    out.push(b);
+  }
+  if (info.deadline && info.st !== "Done") {
+    const n = daysLeft(info.deadline);
+    if (n !== null) {
+      const date = new Date(info.deadline + "T00:00:00")
+        .toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+      const text = n < 0 ? `en retard de ${-n} j` : n === 0 ? "aujourd'hui" : n === 1 ? "demain" : `dans ${n} j`;
+      out.push(el("span", `pill-dl${n <= 2 ? " urgent" : ""}`, `⏰ ${long ? date + " · " : ""}${text}`));
+    }
+  } else if (info.deadline && long) {
+    out.push(el("span", "pill-dl", `⏰ ${info.deadline.split("-").reverse().join("/")}`));
+  }
+  const paid = info.paid === true ? "yes" : info.paid;
+  if (paid === "no") out.push(el("span", "pill-pay", "💶 Non payé"));
+  else if (paid === "yes" && long) out.push(el("span", "pill-pay ok", "✅ Payé"));
+  if (info.client && long) out.push(el("span", "pill-client", `👤 ${info.client}`));
+  return out;
+}
+
 function songRow(e, q) {
   const s = e.song;
   const li = el("li", "row");
@@ -376,6 +415,12 @@ function songRow(e, q) {
     ? `${e.count} fichier${e.count > 1 ? "s" : ""} · ${fmtDate(e.last)}${where ? " · " + where : ""}`
     : `Aucun bounce trouvé${where ? " · " + where : ""}`;
   main.append(title, el("div", "row-sub", sub));
+  const badges = prodBadges(s.i);
+  if (badges.length) {
+    const line = el("div", "prod");
+    line.append(...badges);
+    main.append(line);
+  }
   li.append(main);
   const best = bestFile(s);
   if (best) {
@@ -440,6 +485,9 @@ function openSong(song) {
   current = song;
   $("song-title").textContent = song.n;
   $("song-sub").textContent = song.d;
+  const badges = prodBadges(song.i, true);
+  $("song-prod").replaceChildren(...badges);
+  $("song-prod").hidden = !badges.length;
   const chips = $("variants");
   chips.replaceChildren();
   chips.hidden = !song.v;
