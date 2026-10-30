@@ -11,7 +11,7 @@ const AUTH = "https://login.microsoftonline.com/consumers/oauth2/v2.0";
 const GRAPH = "https://graph.microsoft.com/v1.0";
 const SCOPE = "Files.ReadWrite offline_access User.Read";
 const REDIRECT = new URL("./", location.href).href;
-const VERSION = "1.1";
+const VERSION = "1.2";
 const AUDIO_EXT = /\.(wav|mp3|aif|aiff|flac|m4a)$/i;
 
 const $ = (id) => document.getElementById(id);
@@ -385,7 +385,7 @@ function looseRow(file, q) {
   const title = el("div", "row-title");
   title.append(highlight(stripExt(file.name), q));
   main.append(title, el("div", "row-sub", `${parentName(file.p)}${file.m ? " · " + fmtDate(file.m) : ""}`));
-  li.append(playButton(file), main, sendButton(file, stripExt(file.name)));
+  li.append(playButton(file, [file], stripExt(file.name)), main, sendButton(file, stripExt(file.name)));
   return li;
 }
 
@@ -413,7 +413,7 @@ async function liveSearch() {
       const main = el("div", "row-main");
       main.append(el("div", "row-title", stripExt(it.name)),
                   el("div", "row-sub", `${folder.split("/").pop() || "OneDrive"} · ${fmtDate(file.m)}`));
-      li.append(playButton(file), main, sendButton(file, stripExt(it.name)));
+      li.append(playButton(file, [file], stripExt(it.name)), main, sendButton(file, stripExt(it.name)));
       list.append(li);
     }
     if (!files.length) list.append(el("li", "empty", "Aucun fichier audio trouvé."));
@@ -457,20 +457,20 @@ function fillFiles(v) {
   const bounces = [...v.b].sort((a, b) => isMaster(b) - isMaster(a) || b[1] - a[1]).map(fileObj);
   const list = $("bounces");
   list.replaceChildren();
-  for (const f of bounces) list.append(fileRow(f, title));
+  for (const f of bounces) list.append(fileRow(f, title, bounces));
   if (!bounces.length) list.append(el("li", "empty", "Aucun bounce. Essaie « Chercher dans tout OneDrive »."));
   const stems = v.s.map(fileObj);
   $("stems").replaceChildren(...stems.map((f) => fileRow(f, `${title} (stems)`)));
   $("stems-title").hidden = !stems.length;
 }
 
-function fileRow(file, title) {
+function fileRow(file, title, queue = [file]) {
   const li = el("li", "row");
   const main = el("div", "row-main");
   const kind = file.dir ? "Dossier" : (file.name.split(".").pop() || "").toUpperCase();
   main.append(el("div", "row-title", file.dir ? file.name : stripExt(file.name)),
               el("div", "row-sub", `${parentName(file.p)} · ${file.m ? fmtDate(file.m) : ""} · ${kind}`));
-  li.append(file.dir ? el("span", "play", "▤") : playButton(file), main, sendButton(file, title));
+  li.append(file.dir ? el("span", "play", "▤") : playButton(file, queue, title), main, sendButton(file, title));
   return li;
 }
 
@@ -580,14 +580,20 @@ function sendMail() {
 }
 
 // --- Écoute -------------------------------------------------------------------------
+// Mini-lecteur en bas ; une touche dessus ouvre le lecteur plein écran (barre, ±15 s,
+// fichier précédent / suivant de la même liste, Envoyer). Commandes aussi sur l'écran verrouillé.
 
-let playing = null;
+const ICON_PLAY = '<svg viewBox="0 0 24 24" class="ic"><path d="M8 5v14l11-7z"/></svg>';
+const ICON_PAUSE = '<svg viewBox="0 0 24 24" class="ic"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>';
 
-function playButton(file) {
+let playing = null;       // clé du fichier en cours
+let now = null;           // {file, queue, title}
+
+function playButton(file, queue = [file], title = "") {
   const b = el("button", "play", "▶");
   b.dataset.key = file.id || file.p;
   if (playing && playing === b.dataset.key) { b.classList.add("on"); b.textContent = "❚❚"; }
-  b.addEventListener("click", (ev) => { ev.stopPropagation(); togglePlay(file); });
+  b.addEventListener("click", (ev) => { ev.stopPropagation(); togglePlay(file, queue, title); });
   return b;
 }
 
@@ -599,9 +605,55 @@ function syncPlayButtons() {
     b.textContent = on && !audio.paused ? "❚❚" : "▶";
   });
   $("play-toggle").textContent = audio.paused ? "▶" : "❚❚";
+  $("now-play").innerHTML = audio.paused ? ICON_PLAY : ICON_PAUSE;
+  if ("mediaSession" in navigator) navigator.mediaSession.playbackState = audio.paused ? "paused" : "playing";
 }
 
-async function togglePlay(file) {
+function queueIndex() {
+  return now ? now.queue.findIndex((f) => (f.id || f.p) === playing) : -1;
+}
+
+function fillNow() {
+  if (!now) return;
+  $("now-title").textContent = now.title || stripExt(now.file.name);
+  $("now-file").textContent = `${now.file.name} · ${parentName(now.file.p) || "OneDrive"}`;
+  const i = queueIndex();
+  $("now-prev").disabled = i <= 0;
+  $("now-next").disabled = i < 0 || i >= now.queue.length - 1;
+}
+
+function step(delta) {
+  const next = now && now.queue[queueIndex() + delta];
+  if (next) togglePlay(next, now.queue, now.title);
+}
+
+function skip(sec) {
+  const audio = $("audio");
+  if (!audio.duration) return;
+  audio.currentTime = Math.min(Math.max(0, audio.currentTime + sec), audio.duration - 0.5);
+}
+
+function mediaSession() {
+  if (!("mediaSession" in navigator) || !now) return;
+  const ms = navigator.mediaSession;
+  ms.metadata = new MediaMetadata({
+    title: stripExt(now.file.name), artist: now.title || "SIRØB", album: "SIRØB Mobile",
+    artwork: [{ src: new URL("icons/icon-512.png", location.href).href, sizes: "512x512", type: "image/png" }],
+  });
+  const audio = $("audio");
+  const handlers = {
+    play: () => audio.play(), pause: () => audio.pause(),
+    seekbackward: () => skip(-15), seekforward: () => skip(15),
+    seekto: (d) => { audio.currentTime = d.seekTime; },
+    previoustrack: queueIndex() > 0 ? () => step(-1) : null,
+    nexttrack: queueIndex() < now.queue.length - 1 ? () => step(1) : null,
+  };
+  for (const [action, fn] of Object.entries(handlers)) {
+    try { ms.setActionHandler(action, fn); } catch { /* action non gérée */ }
+  }
+}
+
+async function togglePlay(file, queue = [file], title = "") {
   const audio = $("audio");
   const key = file.id || file.p;
   if (playing === key) {
@@ -609,20 +661,57 @@ async function togglePlay(file) {
     return;
   }
   playing = key;
+  now = { file, queue: queue.filter((f) => !f.dir), title };
   $("play-name").textContent = "Chargement… " + file.name;
   $("player").hidden = false;
+  fillNow();
   syncPlayButtons();
   try {
     const item = await graph(itemUrl(file).replace(/:$/, ""));
     if (playing !== key) return;
     audio.src = item["@microsoft.graph.downloadUrl"];
     $("play-name").textContent = file.name;
+    mediaSession();
     await audio.play();
   } catch (e) {
     if (e instanceof NeedLogin) return showLogin();
     $("play-name").textContent = file.name;
     if (e.name !== "AbortError") toast("Lecture impossible : " + e.message);
   }
+}
+
+function openNow() {
+  if (!now) return;
+  fillNow();
+  $("now").hidden = false;
+  history.pushState({ view: "now" }, "");
+}
+
+function closeNow() { $("now").hidden = true; }
+
+/** Barre de lecture déplaçable (mini-lecteur et plein écran). */
+function wireSeek(pos, timeEl, durEl) {
+  const audio = $("audio");
+  let seeking = false;
+  const paint = (ratio) => pos.style.setProperty("--p", `${(ratio * 100).toFixed(2)}%`);
+  const showTime = () => {
+    const d = audio.duration;
+    if (!seeking) {
+      pos.value = d ? Math.round((audio.currentTime / d) * 1000) : 0;
+      paint(d ? audio.currentTime / d : 0);
+    }
+    timeEl.textContent = clock(seeking && d ? (pos.value / 1000) * d : audio.currentTime);
+    durEl.textContent = clock(d);
+  };
+  for (const ev of ["timeupdate", "loadedmetadata", "durationchange", "emptied", "seeked"]) {
+    audio.addEventListener(ev, showTime);
+  }
+  pos.addEventListener("input", () => { seeking = true; paint(pos.value / 1000); showTime(); });
+  pos.addEventListener("change", () => {
+    if (audio.duration) audio.currentTime = (pos.value / 1000) * audio.duration;
+    seeking = false;
+    showTime();
+  });
 }
 
 function clock(sec) {
@@ -637,7 +726,9 @@ function stopPlay() {
   audio.removeAttribute("src");
   audio.load();
   playing = null;
+  now = null;
   $("player").hidden = true;
+  $("now").hidden = true;
   syncPlayButtons();
 }
 
@@ -652,6 +743,7 @@ function show(name) {
 }
 
 window.addEventListener("popstate", () => {
+  if (!$("now").hidden) { closeNow(); return; }
   if ($("login").hidden) show(!$("mail").hidden ? mailFrom : "search");
 });
 
@@ -718,26 +810,16 @@ function wire() {
   $("play-close").addEventListener("click", stopPlay);
   const audio = $("audio");
   for (const ev of ["play", "pause", "ended"]) audio.addEventListener(ev, syncPlayButtons);
-  // Barre de lecture : on peut la faire glisser pour avancer ou reculer.
-  const pos = $("play-pos");
-  let seeking = false;
-  const paint = (ratio) => pos.style.setProperty("--p", `${(ratio * 100).toFixed(2)}%`);
-  const showTime = () => {
-    const d = audio.duration;
-    if (!seeking) {
-      pos.value = d ? Math.round((audio.currentTime / d) * 1000) : 0;
-      paint(d ? audio.currentTime / d : 0);
-    }
-    $("play-time").textContent = clock(seeking && d ? (pos.value / 1000) * d : audio.currentTime);
-    $("play-dur").textContent = clock(d);
-  };
-  for (const ev of ["timeupdate", "loadedmetadata", "durationchange", "emptied"]) audio.addEventListener(ev, showTime);
-  pos.addEventListener("input", () => { seeking = true; paint(pos.value / 1000); showTime(); });
-  pos.addEventListener("change", () => {
-    if (audio.duration) audio.currentTime = (pos.value / 1000) * audio.duration;
-    seeking = false;
-    showTime();
-  });
+  wireSeek($("play-pos"), $("play-time"), $("play-dur"));
+  wireSeek($("now-pos"), $("now-time"), $("now-dur"));
+  $("player-open").addEventListener("click", openNow);
+  $("now-close").addEventListener("click", () => history.back());
+  $("now-play").addEventListener("click", () => { const a = $("audio"); a.paused ? a.play() : a.pause(); });
+  $("now-back").addEventListener("click", () => skip(-15));
+  $("now-fwd").addEventListener("click", () => skip(15));
+  $("now-prev").addEventListener("click", () => step(-1));
+  $("now-next").addEventListener("click", () => step(1));
+  $("now-send").addEventListener("click", (e) => now && send(now.file, now.title || stripExt(now.file.name), e.currentTarget));
   // Retour dans l'app après un moment : catalogue rafraîchi si le Mac l'a réécrit.
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden && store.get("tok") && Date.now() - store.get("checkedAt", 0) > 5 * 60_000) {

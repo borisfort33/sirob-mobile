@@ -119,7 +119,7 @@
   <!-- Lecteur -->
   <div id="player" class="player" hidden>
     <button id="play-toggle" class="icon-btn">❚❚</button>
-    <div class="player-info">
+    <div class="player-info" id="player-open" role="button" aria-label="Ouvrir le lecteur">
       <span id="play-name"></span>
       <div class="seek">
         <span id="play-time" class="time">0:00</span>
@@ -129,6 +129,35 @@
     </div>
     <button id="play-close" class="icon-btn">✕</button>
   </div>
+  <!-- Lecteur plein écran -->
+  <section id="now" class="now" hidden>
+    <header class="now-top">
+      <button id="now-close" class="icon-btn" aria-label="Réduire">
+        <svg viewBox="0 0 24 24" class="ic stroke"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <span class="dim small">En lecture</span>
+      <span class="icon-btn" aria-hidden="true"></span>
+    </header>
+    <div class="now-art"><img src="icons/icon-512.png" alt=""></div>
+    <div class="now-text">
+      <h2 id="now-title"></h2>
+      <p id="now-file" class="dim"></p>
+    </div>
+    <input id="now-pos" class="big-seek" type="range" min="0" max="1000" step="1" value="0" aria-label="Position">
+    <div class="now-times"><span id="now-time">0:00</span><span id="now-dur">0:00</span></div>
+    <div class="now-ctrl">
+      <button id="now-prev" class="ctl" aria-label="Fichier précédent">
+        <svg viewBox="0 0 24 24" class="ic"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg>
+      </button>
+      <button id="now-back" class="ctl skip" aria-label="Reculer de 15 secondes">−15</button>
+      <button id="now-play" class="ctl main" aria-label="Lecture / pause"></button>
+      <button id="now-fwd" class="ctl skip" aria-label="Avancer de 15 secondes">+15</button>
+      <button id="now-next" class="ctl" aria-label="Fichier suivant">
+        <svg viewBox="0 0 24 24" class="ic"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg>
+      </button>
+    </div>
+    <button id="now-send" class="primary big">Envoyer ce fichier</button>
+  </section>
   <audio id="audio" preload="none" playsinline></audio>
 
   <div id="toast" class="toast" hidden></div>

@@ -1,6 +1,6 @@
 // Garde l'app en cache pour qu'elle s'ouvre instantanément (même avec un mauvais réseau).
 // Changer VERSION à chaque mise à jour pour que l'iPhone récupère les nouveaux fichiers.
-const VERSION = "sirob-mobile-1.1";
+const VERSION = "sirob-mobile-1.2";
 const SHELL = ["./", "index.html", "style.css", "app.js", "config.js", "manifest.webmanifest",
                "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png"];
 
@@ -20,7 +20,8 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== location.origin) return;
   e.respondWith(
-    fetch(e.request)
+    // « no-cache » : toujours vérifier auprès de GitHub, sinon iOS garde l'ancienne version 10 min.
+    fetch(e.request, { cache: "no-cache" })
       .then((resp) => {
         if (resp.ok && !url.search) {
           const copy = resp.clone();
