@@ -11,7 +11,7 @@ const AUTH = "https://login.microsoftonline.com/consumers/oauth2/v2.0";
 const GRAPH = "https://graph.microsoft.com/v1.0";
 const SCOPE = "Files.ReadWrite offline_access User.Read";
 const REDIRECT = new URL("./", location.href).href;
-const VERSION = "1.4";
+const VERSION = "1.5";
 const AUDIO_EXT = /\.(wav|mp3|aif|aiff|flac|m4a)$/i;
 
 const $ = (id) => document.getElementById(id);
@@ -180,7 +180,7 @@ function buildEntries() {
   for (const s of catalogue.songs || []) {
     const all = [...s.b, ...(s.v || []).flatMap((v) => v.b)];
     const last = Math.max(s.m || 0, ...all.map((f) => f[1]));
-    const hay = norm([s.n, s.d, ...all.map((f) => stripExt(baseName(f[0]))), ...(s.v || []).map((v) => v.n)].join(" "));
+    const hay = norm([s.n, s.d, styleOf(s), ...all.map((f) => stripExt(baseName(f[0]))), ...(s.v || []).map((v) => v.n)].join(" "));
     entries.push({ song: s, title: norm(s.n), hay, last, count: all.length });
   }
   for (const f of catalogue.loose || []) {
@@ -232,16 +232,20 @@ function setStatus(text) { $("status").textContent = text; }
 
 // --- Recherche ----------------------------------------------------------------------
 
-// --- Menus : filtres du Mac (SIRØB, M6, Ghost…), années, tags ---------------------
-// Un choix par groupe ; les groupes se combinent (ex. M6 + 2025).
+// --- Menus : filtres du Mac (SIRØB, M6, Ghost…), styles, années, tags -------------
+// Un choix par groupe ; les groupes se combinent (ex. M6 + Afro House + 2025).
 
-let filter = store.get("filter", {});   // {q: "M6", y: 2025, t: "Rouge"}
+let filter = store.get("filter", {});   // {q: "M6", g: "Afro House", y: 2025, t: "Rouge"}
+
+const styleOf = (s) => (s.i && s.i.style) || "";
+const hasFilter = () => !!(filter.q || filter.g || filter.y || filter.t);
 
 function passes(e) {
-  if (!filter.q && !filter.y && !filter.t) return true;
+  if (!hasFilter()) return true;
   if (!e.song) return false;            // exports isolés : seulement sans filtre
   const s = e.song;
   return (!filter.q || (s.q || []).includes(filter.q))
+    && (!filter.g || styleOf(s) === filter.g)
     && (!filter.y || s.y === filter.y)
     && (!filter.t || (s.t || []).includes(filter.t));
 }
@@ -255,6 +259,7 @@ function renderFilters() {
   const count = (pred) => songs.filter(pred).length;
   const groups = [
     ["q", (catalogue.filters || []).filter((n) => count((s) => (s.q || []).includes(n)))],
+    ["g", [...new Set(songs.map(styleOf).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"))],
     ["y", [...new Set(songs.map((s) => s.y).filter(Boolean))].sort((a, b) => b - a)],
     ["t", Object.keys(catalogue.tags || {}).filter((n) => count((s) => (s.t || []).includes(n)))],
   ];
@@ -262,7 +267,7 @@ function renderFilters() {
   for (const [key, values] of groups) if (filter[key] && !values.includes(filter[key])) delete filter[key];
   const off = el("button", offlineView ? "on" : "", "⬇ Sur l'iPhone");
   off.addEventListener("click", () => { offlineView = !offlineView; renderFilters(); render(); window.scrollTo(0, 0); });
-  const all = el("button", !offlineView && !filter.q && !filter.y && !filter.t ? "on" : "", "Tout");
+  const all = el("button", !offlineView && !hasFilter() ? "on" : "", "Tout");
   all.addEventListener("click", () => { offlineView = false; setFilter({}); });
   box.append(off, all);
   for (const [key, values] of groups) {
@@ -271,6 +276,7 @@ function renderFilters() {
     for (const v of values) {
       const b = el("button", !offlineView && filter[key] === v ? "on" : "");
       const color = key === "t" && catalogue.tags[v];
+      if (key === "g") b.append("🎵 ");
       if (color) {
         const dot = el("span", "dot");
         dot.style.background = color;
@@ -297,7 +303,7 @@ function setFilter(f) {
 
 function search(q) {
   const tokens = norm(q).split(/\s+/).filter(Boolean);
-  const filtered = filter.q || filter.y || filter.t;
+  const filtered = hasFilter();
   if (!tokens.length) {
     return entries.filter((e) => passes(e) && (filtered || e.count))
       .sort((a, b) => b.last - a.last).slice(0, filtered ? 400 : 40);
@@ -350,7 +356,7 @@ function render() {
   }
   $("more").hidden = !q.trim();
   $("live-btn").textContent = `Chercher « ${q.trim()} » dans tout OneDrive`;
-  const active = [filter.q, filter.y, filter.t].filter(Boolean).join(" · ");
+  const active = [filter.q, filter.g, filter.y, filter.t].filter(Boolean).join(" · ");
   if (active) setStatus(`${found.length} morceau${found.length > 1 ? "x" : ""} · ${active}`);
   else if (!q.trim()) setStatus(statusText() + " · derniers bounces");
   else setStatus(statusText());
@@ -400,6 +406,7 @@ function prodBadges(info, long = false) {
   if (paid === "no") out.push(el("span", "pill-pay", "💶 Non payé"));
   else if (paid === "yes" && long) out.push(el("span", "pill-pay ok", "✅ Payé"));
   if (info.client && long) out.push(el("span", "pill-client", `👤 ${info.client}`));
+  if (info.style) out.push(el("span", "pill-style", `🎵 ${info.style}`));
   return out;
 }
 
