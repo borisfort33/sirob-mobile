@@ -232,3 +232,4 @@ button { cursor: pointer; }
 .prod .pill-dl.urgent { color: #ff6b6b; border-color: #ff6b6b; font-weight: 600; }
 .prod .pill-pay { color: #ffc048; border-color: #6b5320; }
 .prod .pill-pay.ok { color: #4cd964; border-color: #2a5e33; }
+.prod .pill-style { color: #c9b6ff; border-color: #4b3f73; }
