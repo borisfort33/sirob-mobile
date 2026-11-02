@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>SIRØB Planning</title>
+  <meta name="theme-color" content="#16181d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Planning">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Connexion -->
+  <section id="login" class="screen" hidden>
+    <div class="login-box">
+      <img src="icons/icon-192.png" alt="" class="logo">
+      <h1>SIRØB Planning</h1>
+      <p>Tes rendez-vous, tes tâches et tes morceaux en attente, jour par jour.</p>
+      <button id="login-btn" class="primary big">Se connecter à OneDrive</button>
+      <p id="login-error" class="error" hidden></p>
+    </div>
+  </section>
+
+  <!-- Journée -->
+  <section id="main" class="screen" hidden>
+    <header class="top day-top">
+      <div class="song-head">
+        <h2 id="day-title"></h2>
+        <p id="day-sub" class="dim"></p>
+      </div>
+      <button id="today-btn" class="pill-btn" hidden>Aujourd'hui</button>
+      <button id="refresh-btn" class="icon-btn" aria-label="Actualiser">↻</button>
+      <button id="settings-btn" class="icon-btn" aria-label="Réglages">⚙︎</button>
+    </header>
+    <div id="days" class="days"></div>
+    <p id="status" class="status"></p>
+
+    <div id="gcal-banner" class="card banner" hidden>
+      <p id="gcal-text"></p>
+      <button id="gcal-btn" class="ghost">Connecter Google Agenda</button>
+    </div>
+
+    <div id="agenda-block">
+      <h3 class="section">Rendez-vous</h3>
+      <ul id="events" class="list"></ul>
+    </div>
+
+    <h3 class="section">À faire</h3>
+    <form id="add" class="add" autocomplete="off">
+      <input id="add-text" type="text" placeholder="Ajouter une tâche…" enterkeyhint="done">
+      <input id="add-time" type="time" aria-label="Heure (facultatif)">
+      <button class="add-btn" aria-label="Ajouter">+</button>
+    </form>
+    <ul id="tasks" class="list"></ul>
+
+    <div id="deadlines-block" hidden>
+      <h3 class="section" id="deadlines-title">Deadlines</h3>
+      <ul id="deadlines" class="list"></ul>
+    </div>
+
+    <div id="pending-block" hidden>
+      <h3 class="section"><span id="pending-title">Morceaux en attente</span></h3>
+      <div id="pending-filters" class="chips"></div>
+      <ul id="pending" class="list"></ul>
+    </div>
+  </section>
+
+  <!-- Réglages -->
+  <section id="settings" class="screen sheet" hidden>
+    <header class="top">
+      <button id="settings-back" class="icon-btn back" aria-label="Retour">‹</button>
+      <div class="song-head"><h2>Réglages</h2></div>
+    </header>
+    <div class="card">
+      <p><strong>Google Agenda</strong></p>
+      <p id="gcal-info" class="dim small"></p>
+      <div id="cal-list" class="cal-list"></div>
+      <button id="gcal-toggle" class="ghost"></button>
+    </div>
+    <div class="card">
+      <p id="cat-info"></p>
+      <label for="cat-path">Catalogue des morceaux (écrit par le Mac)</label>
+      <input id="cat-path" type="text" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <p class="dim small">Tes tâches sont enregistrées à côté, dans planning.json : le Mac n'a pas besoin d'être allumé.</p>
+    </div>
+    <div class="card">
+      <p id="account" class="dim"></p>
+      <button id="logout" class="ghost danger">Se déconnecter</button>
+    </div>
+    <p class="dim small center" id="version"></p>
+  </section>
+
+  <!-- Feuille d'actions (tâche, morceau) -->
+  <div id="sheet" class="overlay" hidden>
+    <div class="share-box">
+      <p class="share-title" id="sheet-title"></p>
+      <p id="sheet-sub" class="dim small"></p>
+      <div id="sheet-body" class="sheet-body"></div>
+      <button id="sheet-close" class="ghost">Annuler</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

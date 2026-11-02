@@ -85,3 +85,10 @@ fois : **Réglages > Apps > Mail > Comptes > Ajouter un compte > Autre > Ajouter
 - **Mise à jour de l'app** : dans le dépôt GitHub, Add file > Upload files, glisse les fichiers modifiés, Commit changes.
   L'iPhone prend la nouvelle version à la prochaine ouverture (ferme l'app et rouvre-la).
 - **Emplacement du catalogue** : modifiable dans ⚙︎ si tu déplaces le dossier.
+
+## SIRØB Planning
+
+Une deuxième app vit dans le dossier [`planning`](planning/README.md) : ta journée au même endroit
+(rendez-vous Google Agenda, tes tâches, deadlines et morceaux en attente), à l'adresse
+**https://borisfort33.github.io/sirob-mobile/planning/**. Installation : voir
+[planning/README.md](planning/README.md).
