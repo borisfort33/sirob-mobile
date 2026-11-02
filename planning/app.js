@@ -13,9 +13,11 @@ const GRAPH = "https://graph.microsoft.com/v1.0";
 const SCOPE = "Files.ReadWrite offline_access User.Read";
 const GAUTH = "https://accounts.google.com/o/oauth2/v2/auth";
 const GCAL = "https://www.googleapis.com/calendar/v3";
-const GSCOPE = "https://www.googleapis.com/auth/calendar.readonly";
+const GMAIL = "https://gmail.googleapis.com/gmail/v1/users/me";
+const GSCOPE = "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.readonly";
+const DIGEST_SUBJECT = "Résumé mails SIRØB";
 const REDIRECT = new URL("./", location.href).href;
-const VERSION = "1.0";
+const VERSION = "1.1";
 const DAYS_BEFORE = 7;
 const DAYS_AFTER = 30;
 
@@ -103,6 +105,7 @@ async function handleRedirect() {
       store.set("plan.gtok", {
         access: hash.get("access_token"),
         exp: Date.now() + (Number(hash.get("expires_in")) || 3600) * 1000,
+        scope: hash.get("scope") || "",
       });
       store.set("plan.gcal", true);
       store.del("plan.gNeedsClick");
@@ -366,15 +369,19 @@ function googleToken() {
   return tok && Date.now() < tok.exp - 60_000 ? tok.access : null;
 }
 
-async function gget(path, params = {}) {
+async function gget(path, params = {}, base = GCAL) {
   const tok = googleToken();
   if (!tok) { const e = new Error("expired"); e.expired = true; throw e; }
-  const resp = await fetch(`${GCAL}${path}?${new URLSearchParams(params)}`, {
+  const resp = await fetch(`${base}${path}?${new URLSearchParams(params)}`, {
     headers: { Authorization: `Bearer ${tok}` },
   });
   if (resp.status === 401) { store.del("plan.gtok"); const e = new Error("expired"); e.expired = true; throw e; }
   const data = await resp.json().catch(() => ({}));
-  if (!resp.ok) throw new Error((data.error && data.error.message) || `Erreur Google ${resp.status}`);
+  if (!resp.ok) {
+    const e = new Error((data.error && data.error.message) || `Erreur Google ${resp.status}`);
+    e.status = resp.status;
+    throw e;
+  }
   return data;
 }
 
@@ -690,6 +697,7 @@ function render() {
   renderEvents();
   renderTasks();
   renderSongs();
+  renderDigestCard();
   setStatusLine();
 }
 
@@ -795,6 +803,160 @@ function toast(text) {
   toastTimer = setTimeout(() => { t.hidden = true; }, 2500);
 }
 
+// --- Mails : résumé du matin (écrit par Claude) + non lus des dernières 24 h ------------
+// Le résumé arrive chaque matin dans Gmail, envoyé par une tâche planifiée de Claude, avec
+// l'objet « Résumé mails SIRØB · <date> ». L'app le retrouve et l'affiche ici.
+
+const hasGmail = () => ((store.get("plan.gtok") || {}).scope || "").includes("gmail.readonly");
+
+function b64utf8(data) {
+  const bin = atob(data.replace(/-/g, "+").replace(/_/g, "/"));
+  return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+}
+
+function textOf(payload) {
+  const parts = [payload];
+  let html = "";
+  while (parts.length) {
+    const p = parts.shift();
+    if (p.parts) parts.push(...p.parts);
+    if (p.mimeType === "text/plain" && p.body && p.body.data) return b64utf8(p.body.data);
+    if (p.mimeType === "text/html" && p.body && p.body.data && !html) html = b64utf8(p.body.data);
+  }
+  if (!html) return "";
+  const doc = new DOMParser().parseFromString(html.replace(/<br\s*\/?>/gi, "\n").replace(/<\/(p|div|li|h\d)>/gi, "\n"), "text/html");
+  return doc.body.textContent || "";
+}
+
+const header = (m, name) => ((m.payload && m.payload.headers) || [])
+  .find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || "";
+const senderName = (from) => (from.match(/^\s*"?([^"<]+?)"?\s*</) || [, from])[1].trim();
+const gmailLink = (threadId) => `https://mail.google.com/mail/u/0/#inbox/${threadId}`;
+
+/** Dernier résumé du matin (au plus 3 jours). */
+async function fetchDigest() {
+  const list = await gget("/messages", { q: `subject:"${DIGEST_SUBJECT}" newer_than:3d`, maxResults: "1" }, GMAIL);
+  const id = list.messages && list.messages[0] && list.messages[0].id;
+  if (!id) return null;
+  const m = await gget(`/messages/${id}`, { format: "full" }, GMAIL);
+  return { id, thread: m.threadId, at: Number(m.internalDate), subject: header(m, "Subject"), text: textOf(m.payload).trim() };
+}
+
+async function checkDigest() {
+  if (!hasGmail() || !googleToken()) return;
+  try {
+    const d = await fetchDigest();
+    store.set("plan.digest", d);
+    renderDigestCard();
+  } catch { /* le bouton ✉︎ affichera l'erreur */ }
+}
+
+function renderDigestCard() {
+  const d = store.get("plan.digest");
+  const fresh = d && keyOf(new Date(d.at)) === todayKey() && store.get("plan.digestSeen") !== d.id;
+  $("digest-card").hidden = !(fresh && day === todayKey());
+}
+
+function renderDigest(d) {
+  const box = $("digest");
+  box.textContent = "";
+  if (!d) {
+    box.append(el("p", "dim small", "Pas encore de résumé ces derniers jours. Il arrive chaque matin vers 7 h."));
+    return;
+  }
+  const when = new Date(d.at);
+  box.append(el("p", "digest-when dim small",
+    `${relDay(keyOf(when)) || shortDay(keyOf(when))} à ${hm(when)}`));
+  for (const raw of d.text.split(/\n/)) {
+    const line = raw.trimEnd();
+    if (!line.trim()) continue;
+    if (/^[-–—_=]{3,}$/.test(line.trim())) continue;
+    const t = line.trim();
+    if (/^#+\s/.test(t) || (/^[^a-zà-ÿ]*[A-ZÀ-Ÿ].*:$/.test(t) && t.length < 60)) {
+      box.append(el("h4", "digest-h", t.replace(/^#+\s*/, "").replace(/:$/, "")));
+    } else if (/^[-•*·]\s/.test(t)) {
+      box.append(el("p", "digest-li", t.replace(/^[-•*·]\s*/, "")));
+    } else {
+      box.append(el("p", "digest-p", t));
+    }
+  }
+  const open = el("a", "digest-open small", "Ouvrir dans Gmail ›");
+  open.href = gmailLink(d.thread);
+  open.target = "_blank";
+  box.append(open);
+}
+
+function mailRow(m) {
+  const li = el("li", "row mail");
+  const main = el("div", "row-main");
+  const top = el("div", "mail-top");
+  top.append(el("span", "row-title", senderName(header(m, "From"))));
+  top.append(el("span", "mail-time dim small", hm(new Date(Number(m.internalDate)))));
+  main.append(top);
+  main.append(el("div", "mail-subj", header(m, "Subject") || "(sans objet)"));
+  if (m.snippet) main.append(el("div", "row-sub", m.snippet.replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, "&")));
+  li.append(main);
+  li.addEventListener("click", () => window.open(gmailLink(m.threadId), "_blank"));
+  return li;
+}
+
+async function loadMails(force = false) {
+  const ul = $("unread");
+  const info = $("mails-info");
+  if (!CFG.googleClientId || !store.get("plan.gcal") || !hasGmail()) {
+    $("mails-auth").hidden = false;
+    $("mails-content").hidden = true;
+    return;
+  }
+  $("mails-auth").hidden = true;
+  $("mails-content").hidden = false;
+  if (!googleToken()) {
+    if (force || Date.now() - store.get("plan.gTry", 0) > 60_000) return googleLogin(true);
+    info.textContent = "Connexion Google expirée : touche ↻.";
+    return;
+  }
+  info.textContent = "Chargement…";
+  try {
+    const [d, list] = await Promise.all([
+      fetchDigest(),
+      gget("/messages", { q: `is:unread in:inbox newer_than:1d -subject:"${DIGEST_SUBJECT}"`, maxResults: "40" }, GMAIL),
+    ]);
+    store.set("plan.digest", d);
+    if (d) store.set("plan.digestSeen", d.id);
+    renderDigest(d);
+    renderDigestCard();
+    const full = (await Promise.all((list.messages || []).map((x) => gget(`/messages/${x.id}`, [
+      ["format", "metadata"], ["metadataHeaders", "From"], ["metadataHeaders", "Subject"],
+    ], GMAIL).catch(() => null)))).filter(Boolean);
+    const primary = full.filter((m) => (m.labelIds || []).includes("CATEGORY_PERSONAL") || !(m.labelIds || []).some((l) => l.startsWith("CATEGORY_")));
+    const others = full.length - primary.length;
+    ul.textContent = "";
+    for (const m of primary) ul.append(mailRow(m));
+    if (!primary.length) ul.append(el("li", "empty", "Aucun mail non lu important depuis hier 🎉"));
+    info.textContent = others ? `+ ${others} non lu${others > 1 ? "s" : ""} dans Promotions, Réseaux sociaux ou Notifications` : "";
+  } catch (e) {
+    if (e.expired) return googleLogin(true);
+    if (e.status === 403 && /has not been used|disabled/i.test(e.message)) {
+      info.textContent = "L'API Gmail n'est pas encore activée dans ton projet Google Cloud (voir le guide, étape 4).";
+      return;
+    }
+    if (e.status === 403) {
+      $("mails-auth").hidden = false;
+      $("mails-content").hidden = true;
+      return;
+    }
+    info.textContent = `Mails : ${e.message}`;
+  }
+}
+
+function openMails() {
+  const d = store.get("plan.digest");
+  if (d) renderDigest(d);
+  show("mails");
+  history.pushState({ view: "mails" }, "");
+  loadMails();
+}
+
 // --- Réglages -----------------------------------------------------------------------
 
 function openSettings() {
@@ -862,6 +1024,11 @@ function wire() {
   });
   $("logout").addEventListener("click", logout);
   $("gcal-btn").addEventListener("click", () => googleLogin(false));
+  $("mail-btn").addEventListener("click", openMails);
+  $("digest-card").addEventListener("click", openMails);
+  $("mails-back").addEventListener("click", () => history.back());
+  $("mails-refresh").addEventListener("click", () => loadMails(true));
+  $("mails-auth-btn").addEventListener("click", () => googleLogin(false));
   $("gcal-toggle").addEventListener("click", () => {
     if (store.get("plan.gcal")) {
       for (const k of ["plan.gcal", "plan.gtok", "plan.events", "plan.cals"]) store.del(k);
@@ -904,7 +1071,7 @@ async function refreshAll(manual = false) {
     store.set("plan.gTry", 0);
     $("status").textContent = "Actualisation…";
   }
-  await Promise.all([syncPlan(), loadCatalogue(), loadEvents()]);
+  await Promise.all([syncPlan(), loadCatalogue(), loadEvents().then(checkDigest)]);
   render();
 }
 
