@@ -74,6 +74,20 @@ et il reste privé : seul ton compte pourra s'en servir.
 
 Dans ⚙︎, tu choisis quels agendas afficher (perso, jours fériés…).
 
+### Étape 4 : les mails (résumé du matin)
+
+Le bouton ✉︎ en haut de l'app affiche le **résumé du matin** écrit par Claude et tes **mails non
+lus importants** depuis hier (touche un mail pour l'ouvrir dans Gmail). Quand le résumé du jour
+est arrivé, une carte ☀️ apparaît en haut d'« Aujourd'hui ».
+
+1. Active l'API Gmail dans le même projet Google Cloud :
+   https://console.cloud.google.com/apis/library/gmail.googleapis.com > **Activer**.
+2. Dans l'app : ✉︎ > **Autoriser Gmail** > coche l'accès en lecture à Gmail > **Continuer**.
+   (Lecture seule : l'app ne peut ni envoyer, ni supprimer.)
+
+Le résumé est un mail que Claude t'envoie chaque matin avec l'objet
+« Résumé mails SIRØB · <date> » ; l'app le retrouve et l'affiche joliment.
+
 ## Bon à savoir
 
 - **Google** : sa connexion dure 1 h. Ensuite l'app repasse chez Google toute seule, en une

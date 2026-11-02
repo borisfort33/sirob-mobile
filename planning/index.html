@@ -34,10 +34,16 @@
       </div>
       <button id="today-btn" class="pill-btn" hidden>Aujourd'hui</button>
       <button id="refresh-btn" class="icon-btn" aria-label="Actualiser">↻</button>
+      <button id="mail-btn" class="icon-btn" aria-label="Mes mails">✉︎</button>
       <button id="settings-btn" class="icon-btn" aria-label="Réglages">⚙︎</button>
     </header>
     <div id="days" class="days"></div>
     <p id="status" class="status"></p>
+
+    <button id="digest-card" class="card digest-card" hidden>
+      <span class="digest-icon">☀️</span>
+      <span><strong>Ton résumé mails du jour est prêt</strong><br><span class="dim small">Touche pour le lire</span></span>
+    </button>
 
     <div id="gcal-banner" class="card banner" hidden>
       <p id="gcal-text"></p>
@@ -66,6 +72,26 @@
       <h3 class="section"><span id="pending-title">Morceaux en attente</span></h3>
       <div id="pending-filters" class="chips"></div>
       <ul id="pending" class="list"></ul>
+    </div>
+  </section>
+
+  <!-- Mails -->
+  <section id="mails" class="screen sheet" hidden>
+    <header class="top">
+      <button id="mails-back" class="icon-btn back" aria-label="Retour">‹</button>
+      <div class="song-head"><h2>Mes mails</h2></div>
+      <button id="mails-refresh" class="icon-btn" aria-label="Actualiser">↻</button>
+    </header>
+    <div id="mails-auth" class="card" hidden>
+      <p>Pour afficher tes mails, autorise l'app à lire ta boîte Gmail (lecture seule : elle ne peut ni envoyer, ni supprimer).</p>
+      <button id="mails-auth-btn" class="primary big">Autoriser Gmail</button>
+    </div>
+    <div id="mails-content">
+      <h3 class="section">☀️ Résumé du matin</h3>
+      <div id="digest" class="card digest"></div>
+      <h3 class="section">Non lus depuis hier</h3>
+      <ul id="unread" class="list"></ul>
+      <p id="mails-info" class="status"></p>
     </div>
   </section>
 
