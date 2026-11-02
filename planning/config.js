@@ -7,5 +7,5 @@ window.SIROB_CONFIG = {
   clientId: "3a35d60e-a1e1-4b40-8f59-ac00fb3077de",
   catalogue: "SIROB Browser/catalogue.json",
   planning: "SIROB Browser/planning.json",
-  googleClientId: "",
+  googleClientId: "1045337931059-6ev1vuhjmn3u536967i0rt163j22lft9.apps.googleusercontent.com",
 };
