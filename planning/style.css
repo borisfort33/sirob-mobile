@@ -256,3 +256,7 @@ button { cursor: pointer; }
 .mail-top { display: flex; justify-content: space-between; gap: 8px; }
 .mail-time { flex: none; }
 .mail-subj { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.digest .digest-li.link { cursor: pointer; }
+.digest .digest-li.link:active { opacity: .6; }
+.digest-go { color: var(--accent); font-weight: 700; }
+#mail-app { grid-template-columns: 1fr 1fr 1fr; }
