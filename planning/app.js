@@ -17,7 +17,7 @@ const GMAIL = "https://gmail.googleapis.com/gmail/v1/users/me";
 const GSCOPE = "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.readonly";
 const DIGEST_SUBJECT = "Résumé mails SIRØB";
 const REDIRECT = new URL("./", location.href).href;
-const VERSION = "1.1";
+const VERSION = "1.2";
 const DAYS_BEFORE = 7;
 const DAYS_AFTER = 30;
 
@@ -832,6 +832,19 @@ const header = (m, name) => ((m.payload && m.payload.headers) || [])
   .find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || "";
 const senderName = (from) => (from.match(/^\s*"?([^"<]+?)"?\s*</) || [, from])[1].trim();
 const gmailLink = (threadId) => `https://mail.google.com/mail/u/0/#inbox/${threadId}`;
+const mailApp = () => store.get("plan.mailApp", "spark");
+
+/** Ouvre un mail dans l'app choisie. Spark ne sait pas ouvrir un mail précis depuis une autre
+ *  app : on copie l'objet (à coller dans la recherche de Spark) puis on ouvre Spark. */
+async function openMail(threadId, subject) {
+  if (mailApp() !== "spark") { window.open(gmailLink(threadId), "_blank"); return; }
+  let copied = false;
+  if (subject) {
+    try { await navigator.clipboard.writeText(subject); copied = true; } catch { /* pas grave */ }
+  }
+  if (copied) toast("Objet copié : colle-le dans la recherche de Spark");
+  setTimeout(() => { location.href = "readdle-spark://"; }, copied ? 600 : 0);
+}
 
 /** Dernier résumé du matin (au plus 3 jours). */
 async function fetchDigest() {
@@ -880,8 +893,8 @@ function renderDigest(d) {
       box.append(el("p", "digest-p", t));
     }
   }
-  const open = el("a", "digest-open small", "Ouvrir dans Gmail ›");
-  open.href = gmailLink(d.thread);
+  const open = el("a", "digest-open small", mailApp() === "spark" ? "Ouvrir Spark ›" : "Ouvrir dans Gmail ›");
+  open.href = mailApp() === "spark" ? "readdle-spark://" : gmailLink(d.thread);
   open.target = "_blank";
   box.append(open);
 }
@@ -896,7 +909,7 @@ function mailRow(m) {
   main.append(el("div", "mail-subj", header(m, "Subject") || "(sans objet)"));
   if (m.snippet) main.append(el("div", "row-sub", m.snippet.replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, "&")));
   li.append(main);
-  li.addEventListener("click", () => window.open(gmailLink(m.threadId), "_blank"));
+  li.addEventListener("click", () => openMail(m.threadId, header(m, "Subject")));
   return li;
 }
 
@@ -972,6 +985,7 @@ function openSettings() {
     : connected ? `Connecté${store.get("plan.gemail") ? " : " + store.get("plan.gemail") : ""}. Agendas affichés :`
       : "Non connecté.";
   $("gcal-toggle").hidden = !CFG.googleClientId;
+  for (const b of document.querySelectorAll("#mail-app button")) b.classList.toggle("on", b.dataset.app === mailApp());
   $("gcal-toggle").textContent = connected ? "Déconnecter Google Agenda" : "Connecter Google Agenda";
   const list = $("cal-list");
   list.textContent = "";
@@ -1029,6 +1043,12 @@ function wire() {
   $("mails-back").addEventListener("click", () => history.back());
   $("mails-refresh").addEventListener("click", () => loadMails(true));
   $("mails-auth-btn").addEventListener("click", () => googleLogin(false));
+  for (const b of document.querySelectorAll("#mail-app button")) {
+    b.addEventListener("click", () => {
+      store.set("plan.mailApp", b.dataset.app);
+      for (const x of document.querySelectorAll("#mail-app button")) x.classList.toggle("on", x === b);
+    });
+  }
   $("gcal-toggle").addEventListener("click", () => {
     if (store.get("plan.gcal")) {
       for (const k of ["plan.gcal", "plan.gtok", "plan.events", "plan.cals"]) store.del(k);
