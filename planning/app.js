@@ -17,7 +17,7 @@ const GMAIL = "https://gmail.googleapis.com/gmail/v1/users/me";
 const GSCOPE = "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.readonly";
 const DIGEST_SUBJECT = "Résumé mails SIRØB";
 const REDIRECT = new URL("./", location.href).href;
-const VERSION = "1.2";
+const VERSION = "1.3";
 const DAYS_BEFORE = 7;
 const DAYS_AFTER = 30;
 
@@ -834,16 +834,42 @@ const senderName = (from) => (from.match(/^\s*"?([^"<]+?)"?\s*</) || [, from])[1
 const gmailLink = (threadId) => `https://mail.google.com/mail/u/0/#inbox/${threadId}`;
 const mailApp = () => store.get("plan.mailApp", "spark");
 
-/** Ouvre un mail dans l'app choisie. Spark ne sait pas ouvrir un mail précis depuis une autre
- *  app : on copie l'objet (à coller dans la recherche de Spark) puis on ouvre Spark. */
-async function openMail(threadId, subject) {
-  if (mailApp() !== "spark") { window.open(gmailLink(threadId), "_blank"); return; }
+/** Ouvre un mail dans l'app choisie.
+ *  - Mail (iPhone) : lien message://<Message-ID>, ouvre le mail précis (s'il est dans un compte de l'app Mail).
+ *  - Spark : ne sait pas ouvrir un mail précis depuis une autre app ; on copie l'objet puis on ouvre Spark.
+ *  - Gmail : lien web vers le fil. */
+async function openMail(threadId, subject, msgId) {
+  const app = mailApp();
+  if (app === "mail" && msgId) { location.href = `message://%3C${encodeURIComponent(msgId.trim().replace(/^<|>$/g, "")).replace(/%40/g, "@")}%3E`;
+    return;
+  }
+  if (app === "gmail" || (app === "mail" && !msgId)) { window.open(gmailLink(threadId), "_blank"); return; }
   let copied = false;
   if (subject) {
     try { await navigator.clipboard.writeText(subject); copied = true; } catch { /* pas grave */ }
   }
   if (copied) toast("Objet copié : colle-le dans la recherche de Spark");
   setTimeout(() => { location.href = "readdle-spark://"; }, copied ? 600 : 0);
+}
+
+/** Le résumé se termine par un bloc « --- liens --- » : « [1] <id Gmail> ». Chaque ligne du
+ *  résumé qui finit par [1] devient cliquable et ouvre ce mail-là. */
+function parseDigest(text) {
+  const [body, links = ""] = text.split(/^-{2,}\s*liens\s*-{2,}\s*$/im);
+  const refs = {};
+  for (const m of links.matchAll(/^\s*\[(\d+)\]\s*([0-9a-f]{10,})/gim)) refs[m[1]] = m[2];
+  return { body, refs };
+}
+
+const digestMeta = {};   // id Gmail -> {threadId, subject, msgId}
+async function loadDigestRefs(refs) {
+  await Promise.all(Object.values(refs).filter((id) => !digestMeta[id]).map(async (id) => {
+    try {
+      const m = await gget(`/messages/${id}`, [["format", "metadata"], ["metadataHeaders", "Subject"],
+        ["metadataHeaders", "Message-ID"]], GMAIL);
+      digestMeta[id] = { threadId: m.threadId, subject: header(m, "Subject"), msgId: header(m, "Message-ID") };
+    } catch { /* le mail a pu être supprimé */ }
+  }));
 }
 
 /** Dernier résumé du matin (au plus 3 jours). */
@@ -880,21 +906,37 @@ function renderDigest(d) {
   const when = new Date(d.at);
   box.append(el("p", "digest-when dim small",
     `${relDay(keyOf(when)) || shortDay(keyOf(when))} à ${hm(when)}`));
-  for (const raw of d.text.split(/\n/)) {
-    const line = raw.trimEnd();
+  const { body, refs } = parseDigest(d.text);
+  for (const raw of body.split(/\n/)) {
+    let line = raw.trimEnd();
+    const ref = line.match(/\s*\[(\d+)\]\s*$/);
+    if (ref) line = line.slice(0, ref.index);
     if (!line.trim()) continue;
     if (/^[-–—_=]{3,}$/.test(line.trim())) continue;
     const t = line.trim();
     if (/^#+\s/.test(t) || (/^[^a-zà-ÿ]*[A-ZÀ-Ÿ].*:$/.test(t) && t.length < 60)) {
       box.append(el("h4", "digest-h", t.replace(/^#+\s*/, "").replace(/:$/, "")));
     } else if (/^[-•*·]\s/.test(t)) {
-      box.append(el("p", "digest-li", t.replace(/^[-•*·]\s*/, "")));
+      const li = el("p", "digest-li", t.replace(/^[-•*·]\s*/, ""));
+      const id = ref && refs[ref[1]];
+      if (id) {
+        li.classList.add("link");
+        li.append(el("span", "digest-go", " ›"));
+        li.addEventListener("click", () => {
+          const m = digestMeta[id];
+          if (m) openMail(m.threadId, m.subject, m.msgId);
+          else toast("Mail introuvable (supprimé ?)");
+        });
+      }
+      box.append(li);
     } else {
       box.append(el("p", "digest-p", t));
     }
   }
-  const open = el("a", "digest-open small", mailApp() === "spark" ? "Ouvrir Spark ›" : "Ouvrir dans Gmail ›");
-  open.href = mailApp() === "spark" ? "readdle-spark://" : gmailLink(d.thread);
+  if (Object.keys(refs).length && googleToken()) loadDigestRefs(refs);
+  const names = { spark: "Ouvrir Spark ›", mail: "Ouvrir Mail ›", gmail: "Ouvrir dans Gmail ›" };
+  const open = el("a", "digest-open small", names[mailApp()] || names.gmail);
+  open.href = mailApp() === "spark" ? "readdle-spark://" : mailApp() === "mail" ? "message://" : gmailLink(d.thread);
   open.target = "_blank";
   box.append(open);
 }
@@ -909,7 +951,7 @@ function mailRow(m) {
   main.append(el("div", "mail-subj", header(m, "Subject") || "(sans objet)"));
   if (m.snippet) main.append(el("div", "row-sub", m.snippet.replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, "&")));
   li.append(main);
-  li.addEventListener("click", () => openMail(m.threadId, header(m, "Subject")));
+  li.addEventListener("click", () => openMail(m.threadId, header(m, "Subject"), header(m, "Message-ID")));
   return li;
 }
 
@@ -939,7 +981,7 @@ async function loadMails(force = false) {
     renderDigest(d);
     renderDigestCard();
     const full = (await Promise.all((list.messages || []).map((x) => gget(`/messages/${x.id}`, [
-      ["format", "metadata"], ["metadataHeaders", "From"], ["metadataHeaders", "Subject"],
+      ["format", "metadata"], ["metadataHeaders", "From"], ["metadataHeaders", "Subject"], ["metadataHeaders", "Message-ID"],
     ], GMAIL).catch(() => null)))).filter(Boolean);
     const primary = full.filter((m) => (m.labelIds || []).includes("CATEGORY_PERSONAL") || !(m.labelIds || []).some((l) => l.startsWith("CATEGORY_")));
     const others = full.length - primary.length;
