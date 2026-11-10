@@ -11,7 +11,7 @@ const AUTH = "https://login.microsoftonline.com/consumers/oauth2/v2.0";
 const GRAPH = "https://graph.microsoft.com/v1.0";
 const SCOPE = "Files.ReadWrite offline_access User.Read";
 const REDIRECT = new URL("./", location.href).href;
-const VERSION = "1.5";
+const VERSION = "1.6";
 const AUDIO_EXT = /\.(wav|mp3|aif|aiff|flac|m4a)$/i;
 
 const $ = (id) => document.getElementById(id);
@@ -104,7 +104,7 @@ async function accessToken(force = false) {
 }
 
 function logout() {
-  for (const k of ["tok", "links", "account", "catalogue"]) store.del(k);
+  for (const k of ["tok", "links", "account", "catalogue", "ideasETag", "ideasAt"]) store.del(k);
   catalogue = null;
   entries = [];
   history.back();
@@ -123,6 +123,7 @@ async function graph(path, options = {}, retry = true) {
       headers: {
         Authorization: `Bearer ${await accessToken()}`,
         ...(options.body ? { "Content-Type": "application/json" } : {}),
+        ...(options.headers || {}),
       },
     });
   } catch (e) {
@@ -228,7 +229,10 @@ function statusText() {
   const n = (catalogue.songs || []).length;
   return `${n} morceaux · catalogue du Mac ${ago(catalogue.generated)}`;
 }
-function setStatus(text) { $("status").textContent = text; }
+function setStatus(text) {
+  if (typeof ideasActive === "function" && ideasActive()) return;   // l'onglet Idées a son propre statut
+  $("status").textContent = text;
+}
 
 // --- Recherche ----------------------------------------------------------------------
 
@@ -253,7 +257,7 @@ function passes(e) {
 function renderFilters() {
   const box = $("filters");
   box.replaceChildren();
-  if (!catalogue) { box.hidden = true; return; }
+  if (!catalogue || (typeof ideasActive === "function" && ideasActive())) { box.hidden = true; return; }
   box.hidden = false;
   const songs = catalogue.songs || [];
   const count = (pred) => songs.filter(pred).length;
@@ -342,6 +346,7 @@ function bestFile(song) {
 }
 
 function render() {
+  if (typeof ideasActive === "function" && ideasActive()) { renderIdeas(); return; }
   const q = $("q").value;
   $("clear").hidden = !q;
   if (offlineView) { renderOffline(); return; }
@@ -978,7 +983,7 @@ function stopPlay() {
 
 // --- Navigation, réglages ------------------------------------------------------------
 
-const SHEETS = ["song", "settings", "mail"];
+const SHEETS = ["song", "settings", "mail", "idea"];
 function show(name) {
   for (const s of SHEETS) $(s).hidden = s !== name;
   $("search").hidden = name === "login";

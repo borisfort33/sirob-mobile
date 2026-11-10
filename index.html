@@ -36,6 +36,10 @@
       </div>
       <button id="settings-btn" class="icon-btn" aria-label="Réglages">⚙︎</button>
     </header>
+    <div id="tabs" class="seg" role="tablist">
+      <button data-tab="songs" class="on">🎧 Morceaux</button>
+      <button data-tab="ideas">💡 Idées de prod</button>
+    </div>
     <div id="filters" class="chips filters" hidden></div>
     <p id="status" class="status"></p>
     <ul id="results" class="list"></ul>
@@ -43,6 +47,32 @@
       <button id="live-btn" class="ghost">Chercher dans tout OneDrive</button>
     </div>
     <ul id="live" class="list"></ul>
+    <div id="ideas-list" class="notes" hidden></div>
+    <button id="idea-new" class="fab" aria-label="Nouvelle idée" hidden>
+      <svg viewBox="0 0 24 24" class="ic stroke"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/></svg>
+    </button>
+  </section>
+
+  <!-- Idée de prod (façon Notes) -->
+  <section id="idea" class="screen sheet notes-sheet" hidden>
+    <header class="top">
+      <button id="idea-back" class="icon-btn back notes-back" aria-label="Retour">‹ <span>Idées</span></button>
+      <span class="spacer"></span>
+      <button id="idea-pin" class="icon-btn tool" aria-label="Épingler">📌</button>
+      <button id="idea-done" class="icon-btn tool" aria-label="Faite">✓</button>
+      <button id="idea-delete" class="icon-btn tool" aria-label="Supprimer">🗑</button>
+    </header>
+    <p id="idea-date" class="dim small center"></p>
+    <div class="idea-from">
+      <label for="idea-from">De la part de</label>
+      <input id="idea-from" type="text" list="idea-senders" autocomplete="off" autocapitalize="words"
+             placeholder="Qui t'a envoyé l'idée ?">
+      <datalist id="idea-senders"></datalist>
+    </div>
+    <textarea id="idea-text" class="idea-text" placeholder="Titre de l'idée&#10;Colle les liens YouTube, Shazam… et écris la direction à prendre."></textarea>
+    <button id="idea-paste" class="ghost paste">📋 Coller un lien</button>
+    <h3 class="section" id="idea-links-title" hidden>Écouter</h3>
+    <div id="idea-links" class="links"></div>
   </section>
 
   <!-- Morceau -->
@@ -181,5 +211,6 @@
 
   <script src="config.js"></script>
   <script src="app.js"></script>
+  <script src="ideas.js"></script>
 </body>
 </html>
