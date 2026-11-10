@@ -233,3 +233,48 @@ button { cursor: pointer; }
 .prod .pill-pay { color: #ffc048; border-color: #6b5320; }
 .prod .pill-pay.ok { color: #4cd964; border-color: #2a5e33; }
 .prod .pill-style { color: #c9b6ff; border-color: #4b3f73; }
+
+/* --- Idées de prod (façon Notes) ------------------------------------------------- */
+:root { --notes: #e5b937; --notes-card: #2c2c2e; }
+.seg { display: flex; gap: 4px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+       padding: 3px; margin: 0 0 8px; }
+.seg button { flex: 1; border: 0; background: none; color: var(--dim); padding: 7px 4px; border-radius: 8px;
+              font-size: 14px; font-weight: 600; }
+.seg button.on { background: var(--border); color: var(--text); }
+.notes-head { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin: 14px 4px 6px; }
+.notes-card { list-style: none; margin: 0 0 8px; padding: 0; background: var(--notes-card); border-radius: 12px; overflow: hidden; }
+.note { padding: 11px 14px 10px; border-bottom: 1px solid #3a3a3c; cursor: pointer; }
+.note:last-child { border-bottom: 0; }
+.note:active { background: #3a3a3c; }
+.note-title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note-sub { color: var(--dim); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.note-date { color: var(--text); margin-right: 4px; }
+.note-from { color: var(--dim); font-size: 13px; margin-top: 2px; }
+.note.done .note-title { color: var(--dim); text-decoration: line-through; }
+.notes .empty { white-space: pre-line; padding-top: 40px; }
+.fab { position: fixed; right: 18px; bottom: calc(var(--safe-bottom) + 86px); z-index: 4; width: 56px; height: 56px;
+       border-radius: 50%; border: 0; background: var(--notes); color: #1c1c1e; box-shadow: 0 6px 18px rgba(0,0,0,.45); }
+.fab .ic { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linejoin: round; }
+.notes-sheet { background: #1c1c1e; }
+.notes-sheet .top { background: linear-gradient(#1c1c1e 85%, transparent); }
+.notes-back { color: var(--notes); font-size: 30px; display: flex; align-items: center; gap: 2px; padding-right: 8px; }
+.notes-back span { font-size: 17px; }
+.spacer { flex: 1; }
+.tool { color: var(--notes); font-size: 18px; opacity: .55; }
+.tool.on { opacity: 1; background: var(--notes-card); }
+.idea-from { display: flex; align-items: center; gap: 10px; margin: 6px 0 4px; }
+.idea-from label { color: var(--dim); font-size: 14px; flex: none; }
+.idea-from input { flex: 1; min-width: 0; background: var(--notes-card); border: 0; border-radius: 10px; padding: 9px 12px;
+                   font-size: 16px; outline: none; }
+.idea-text { width: 100%; min-height: 240px; border: 0; outline: none; background: transparent; color: var(--text);
+             font: 17px/1.45 -apple-system, BlinkMacSystemFont, sans-serif; padding: 8px 2px; resize: none; caret-color: var(--notes); }
+.paste { color: var(--notes); margin: 4px 0 8px; }
+.links { display: flex; flex-direction: column; gap: 10px; }
+.link-top { display: flex; gap: 8px; }
+.link-btn { flex: 1; text-align: left; background: var(--notes-card); border: 0; border-radius: 12px; padding: 12px 14px;
+            font-weight: 600; }
+.link-open { background: var(--notes-card); border: 0; border-radius: 12px; width: 46px; color: var(--notes); font-size: 18px; }
+.embed { margin-top: 8px; }
+.embed p { margin: 0 0 6px; }
+.embed iframe { width: 100%; border: 0; border-radius: 12px; background: #000; display: block; }
+.embed iframe.video { aspect-ratio: 16 / 9; height: auto; }

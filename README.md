@@ -92,3 +92,10 @@ Une deuxième app vit dans le dossier [`planning`](planning/README.md) : ta jour
 (rendez-vous Google Agenda, tes tâches, deadlines et morceaux en attente), à l'adresse
 **https://borisfort33.github.io/sirob-mobile/planning/**. Installation : voir
 [planning/README.md](planning/README.md).
+
+## 💡 Idées de prod (1.6)
+
+Onglet « Idées de prod » (façon Notes) : liste, ✎ nouvelle idée, « De la part de », 📌, ✓ faite, 🗑.
+Les liens YouTube, SoundCloud, Spotify, Deezer, Apple Music se jouent dans l'app ; un lien Shazam
+est retrouvé sur Apple Music (extrait 30 s). Synchro avec l'app du Mac par
+`OneDrive/SIROB Browser/idees.json` (fusion idée par idée, eTag / If-Match).
