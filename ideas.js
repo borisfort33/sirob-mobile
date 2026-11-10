@@ -79,8 +79,11 @@ function touch(id, fields) {
 
 async function fetchRemote() {
   try {
-    const item = await graph(`/me/drive/root:/${encPath(IDEAS_PATH)}?$select=eTag,@microsoft.graph.downloadUrl`);
-    const resp = await fetch(item["@microsoft.graph.downloadUrl"], { cache: "no-store" });
+    const item = await graph(`/me/drive/root:/${encPath(IDEAS_PATH)}`);
+    const url = item["@microsoft.graph.downloadUrl"];
+    if (!url) throw new Error("OneDrive n'a pas donné le fichier des idées");
+    const resp = await fetch(url, { cache: "no-store" });
+    if (!resp.ok) throw new Error(`Téléchargement des idées refusé (${resp.status})`);
     const data = await resp.json().catch(() => ({}));
     return { eTag: item.eTag, items: Array.isArray(data) ? data : (data.ideas || []) };
   } catch (e) {
@@ -110,7 +113,7 @@ async function syncIdeas() {
       let remote;
       try { remote = await fetchRemote(); } catch (e) {
         if (e instanceof NeedLogin) return;
-        setIdeasStatus(`Hors ligne : ${ideasDirty ? "modifications gardées sur l'iPhone, " : ""}synchro au retour du réseau`);
+        setIdeasStatus(`Synchro impossible : ${e.message}${ideasDirty ? " · modifications gardées sur l'iPhone" : ""}`);
         return;
       }
       const merged = mergeIdeas(ideas, remote.items);
@@ -157,7 +160,7 @@ function setTab(tab) {
   $("q").placeholder = ideaTab ? "Chercher une idée, un nom…" : "Titre, artiste, client…";
   if (ideaTab) {
     renderIdeas();
-    if (nowMs() - store.get("ideasAt", 0) > 20_000) syncIdeas();
+    syncIdeas();   // à chaque ouverture de l'onglet : on récupère ce que le Mac a écrit
   } else {
     if (typeof renderFilters === "function") renderFilters();
     render();

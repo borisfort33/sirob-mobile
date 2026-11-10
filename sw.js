@@ -1,6 +1,6 @@
 // Garde l'app en cache pour qu'elle s'ouvre instantanément (même avec un mauvais réseau).
 // Changer VERSION à chaque mise à jour pour que l'iPhone récupère les nouveaux fichiers.
-const VERSION = "sirob-mobile-1.6";
+const VERSION = "sirob-mobile-1.6.1";
 const SHELL = ["./", "index.html", "style.css", "app.js", "ideas.js", "config.js", "manifest.webmanifest",
                "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png"];
 
