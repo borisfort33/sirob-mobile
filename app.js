@@ -11,7 +11,7 @@ const AUTH = "https://login.microsoftonline.com/consumers/oauth2/v2.0";
 const GRAPH = "https://graph.microsoft.com/v1.0";
 const SCOPE = "Files.ReadWrite offline_access User.Read";
 const REDIRECT = new URL("./", location.href).href;
-const VERSION = "1.7";
+const VERSION = "1.7.1";
 const AUDIO_EXT = /\.(wav|mp3|aif|aiff|flac|m4a)$/i;
 
 const $ = (id) => document.getElementById(id);
@@ -49,7 +49,9 @@ async function login() {
     code_challenge: challenge, code_challenge_method: "S256", state, response_mode: "query",
   });
   const hint = store.get("account");
+  // Après une déconnexion, laisse choisir le compte Microsoft au lieu de reprendre le précédent.
   if (hint) params.set("login_hint", hint);
+  else params.set("prompt", "select_account");
   location.href = `${AUTH}/authorize?${params}`;
 }
 

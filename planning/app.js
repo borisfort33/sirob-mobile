@@ -17,7 +17,7 @@ const GMAIL = "https://gmail.googleapis.com/gmail/v1/users/me";
 const GSCOPE = "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.readonly";
 const DIGEST_SUBJECT = "Résumé mails SIRØB";
 const REDIRECT = new URL("./", location.href).href;
-const VERSION = "1.2";
+const VERSION = "1.2.1";
 const DAYS_BEFORE = 7;
 const DAYS_AFTER = 30;
 
@@ -75,7 +75,9 @@ async function login() {
     code_challenge: challenge, code_challenge_method: "S256", state, response_mode: "query",
   });
   const hint = store.get("account");
+  // Après une déconnexion, laisse choisir le compte Microsoft au lieu de reprendre le précédent.
   if (hint) params.set("login_hint", hint);
+  else params.set("prompt", "select_account");
   location.href = `${AUTH}/authorize?${params}`;
 }
 
