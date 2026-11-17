@@ -205,12 +205,16 @@ function libTracks(node) {
       for (const e of sub.s || []) {
         if (seen.has(e.k)) continue;
         seen.add(e.k);
-        out.push({ e, i: null, song: map.get(e.k) || null });
+        const song = map.get(e.k) || null;
+        if (song && !libFile(song, e)) continue;
+        out.push({ e, i: null, song });
       }
     }
     return out;
   }
-  return (node.s || []).map((e, i) => ({ e, i, song: map.get(e.k) || null }));
+  return (node.s || []).map((e, i) => ({ e, i, song: map.get(e.k) || null }))
+    // Morceau sans export : pas affiché (comme sur le Mac), il revient dès qu'il en a un.
+    .filter((t) => !t.song || libFile(t.song, t.e));
 }
 const keyName = (k) => stripExt(baseName(k || ""));
 
