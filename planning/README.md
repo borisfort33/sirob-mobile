@@ -4,7 +4,8 @@ Ta journée au même endroit, jour par jour :
 
 - **Rendez-vous** de ton Google Agenda (lecture seule) ;
 - **Tes tâches** : tu les ajoutes, coches, déplaces à demain ou à un autre jour, avec une heure si
-  tu veux. Une tâche pas faite reste en haut d'« Aujourd'hui » jusqu'à ce que tu la coches ;
+  tu veux. Une tâche pas cochée est **reportée automatiquement au jour suivant**, et ainsi de suite chaque jour,
+  jusqu'à ce que tu la coches (elle s'affiche en haut avec « ↻ Reportée · prévue … ») ;
 - **Deadlines** des morceaux (celles du jour et celles en retard) ;
 - **Morceaux en attente** : tous ceux qui ont un statut Idée, Active ou Mix (ou une deadline) dans
   l'app du Mac. Touche un morceau pour le planifier aujourd'hui, demain ou un autre jour.
