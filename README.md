@@ -99,3 +99,15 @@ Onglet « Idées de prod » (façon Notes) : liste, ✎ nouvelle idée, « De la
 Les liens YouTube, SoundCloud, Spotify, Deezer, Apple Music se jouent dans l'app ; un lien Shazam
 est retrouvé sur Apple Music (extrait 30 s). Synchro avec l'app du Mac par
 `OneDrive/SIROB Browser/idees.json` (fusion idée par idée, eTag / If-Match).
+
+## 🎵 Playlists (1.7)
+
+Onglet « 🎵 Playlists » : les dossiers et playlists créés dans l'onglet Bibliothèque de l'app du
+Mac (2.4), synchronisés dans les deux sens par `OneDrive/SIROB Browser/bibliotheque.json`.
+
+- Dossiers imbriqués, playlists, ▶ Lire / 🔀 Aléatoire (précédent/suivant suivent la playlist).
+- « Envoyer » une playlist entière ou « Sélect. » quelques morceaux : un seul message avec un lien
+  OneDrive (lecture seule) par export, via WhatsApp/partage iOS, mail ou copie. Jamais les stems.
+- ＋ pour créer une playlist ou un dossier ; « ⋯ » pour renommer, ranger, supprimer ;
+  « ＋ Ajouter à une playlist » sur la fiche d'un morceau ; ↑ ↓ et Retirer en mode sélection.
+- Les morceaux sont retrouvés grâce au champ `k` du catalogue (écrit par l'app du Mac 2.4).
