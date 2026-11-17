@@ -17,7 +17,7 @@ const GMAIL = "https://gmail.googleapis.com/gmail/v1/users/me";
 const GSCOPE = "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.readonly";
 const DIGEST_SUBJECT = "Résumé mails SIRØB";
 const REDIRECT = new URL("./", location.href).href;
-const VERSION = "1.1";
+const VERSION = "1.2";
 const DAYS_BEFORE = 7;
 const DAYS_AFTER = 30;
 
@@ -197,7 +197,8 @@ async function rememberAccount() {
 }
 
 // --- Tâches : planning.json dans OneDrive ----------------------------------------------
-// Chaque tâche : {id, t: texte, d: "AAAA-MM-JJ", h: "HH:MM" | "", done, song?, c: créée, u: modifiée, del?}
+// Chaque tâche : {id, t: texte, d: "AAAA-MM-JJ", h: "HH:MM" | "", done, song?, c: créée, u: modifiée, del?,
+//                 from?: jour prévu à l'origine quand la tâche a été reportée}
 // Fusion par tâche (la plus récemment modifiée gagne) : iPhone, iPad et Mac peuvent écrire
 // le même fichier sans s'écraser.
 
@@ -254,6 +255,7 @@ async function doSync(attempt = 0) {
     if (remote) {
       plan = { ...remote, tasks: mergeTasks(plan.tasks || [], remote.tasks || []) };
       planETag = etag;
+      if (rollOver()) store.set("plan.dirty", true);
       keepPlan();
       render();
     } else if (etag === null) {
@@ -293,6 +295,21 @@ function addTask(text, day, h = "", song) {
   plan.tasks = [...(plan.tasks || []), t];
   changed();
   return t;
+}
+
+/** Report : chaque tâche pas cochée d'un jour passé passe à aujourd'hui (et ainsi de suite
+ *  chaque jour jusqu'à ce qu'elle soit cochée). Le jour prévu d'origine reste dans « from ».
+ *  Renvoie le nombre de tâches reportées (enregistrées ensuite dans OneDrive). */
+function rollOver() {
+  const today = todayKey();
+  const now = Date.now();
+  let n = 0;
+  plan.tasks = (plan.tasks || []).map((t) => {
+    if (t.del || t.done || !t.d || t.d >= today) return t;
+    n++;
+    return { ...t, from: t.from || t.d, d: today, u: now };
+  });
+  return n;
 }
 
 function updateTask(id, patch) {
@@ -601,7 +618,11 @@ function taskRow(t, carried) {
   if (t.h) title.append(el("span", "task-time", t.h));
   title.append(document.createTextNode((t.song ? "🎛 " : "") + t.t));
   main.append(title);
-  if (carried) main.append(el("div", "row-sub late", `Prévu ${shortDay(t.d)} · pas encore fait`));
+  const since = t.from && t.from < t.d ? t.from : carried ? t.d : null;
+  if (since && !t.done) {
+    const n = Math.round((dateOf(todayKey()) - dateOf(since)) / 86_400_000);
+    main.append(el("div", "row-sub late", `↻ Reportée · prévue ${n === 1 ? "hier" : shortDay(since)}${n > 1 ? ` (${n} j)` : ""}`));
+  }
   if (t.song) {
     const prod = el("div", "prod");
     prod.append(...prodBadges(songInfo(t.song)).filter((b) => !b.classList.contains("pill-style")));
@@ -617,10 +638,13 @@ function renderTasks() {
   ul.textContent = "";
   const today = todayKey();
   const all = liveTasks();
-  const mine = all.filter((t) => t.d === day);
-  const carried = day === today ? all.filter((t) => !t.done && t.d < today) : [];
+  const rolled = (t) => !t.done && t.from && t.from < t.d;
+  const mine = all.filter((t) => t.d === day && !rolled(t));
+  // Reportées en haut (les plus anciennes d'abord) ; « d < today » couvre une tâche pas encore reportée.
+  const carried = all.filter((t) => (t.d === day && rolled(t)) || (day === today && !t.done && t.d < today))
+    .map((t) => ({ ...t, from: t.from || t.d }));
   const order = (a, b) => (a.done - b.done) || (a.h || "99").localeCompare(b.h || "99") || a.c - b.c;
-  carried.sort((a, b) => a.d.localeCompare(b.d) || order(a, b));
+  carried.sort((a, b) => a.from.localeCompare(b.from) || order(a, b));
   mine.sort(order);
   for (const t of carried) ul.append(taskRow(t, true));
   for (const t of mine) ul.append(taskRow(t, false));
@@ -748,7 +772,7 @@ function dayChoices(body, current, onPick) {
 }
 
 function openTask(t) {
-  openSheet(t.song ? "Morceau à travailler" : "Tâche", t.d < todayKey() && !t.done ? `Prévue ${shortDay(t.d)}` : "", (body) => {
+  openSheet(t.song ? "Morceau à travailler" : "Tâche", !t.done && (t.from || t.d) < todayKey() ? `Prévue ${shortDay(t.from || t.d)} · reportée jusqu'à ce que tu la coches` : "", (body) => {
     const text = el("input", "field");
     text.type = "text";
     text.value = t.t;
@@ -767,7 +791,7 @@ function openTask(t) {
     }));
     body.append(el("p", "dim small sheet-label", "Déplacer à"));
     dayChoices(body, t.d, (k) => {
-      save(); updateTask(t.id, { d: k, done: false }); closeSheet();
+      save(); updateTask(t.id, { d: k, done: false, from: undefined }); closeSheet();
       toast(`Déplacée à ${relDay(k).toLowerCase() || shortDay(k)}`);
     });
     body.append(button("Enregistrer", "ghost big", () => { save(); closeSheet(); }));
@@ -1056,7 +1080,11 @@ function wire() {
   let lastToday = todayKey();
   document.addEventListener("visibilitychange", () => {
     if (document.hidden || !store.get("tok")) return;
-    if (todayKey() !== lastToday) { if (day === lastToday) day = todayKey(); lastToday = todayKey(); }
+    if (todayKey() !== lastToday) {
+      if (day === lastToday) day = todayKey();
+      lastToday = todayKey();
+      if (rollOver()) changed();
+    }
     if (Date.now() - store.get("plan.checkedAt", 0) > 2 * 60_000) refreshAll();
     else render();
   });
@@ -1085,7 +1113,7 @@ async function start() {
   }
   if (!store.get("tok")) return showLogin();
   show("main");
-  render();
+  if (rollOver()) changed(); else render();
   rememberAccount();
   refreshAll();
 }
