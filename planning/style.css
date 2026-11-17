@@ -256,3 +256,33 @@ button { cursor: pointer; }
 .mail-top { display: flex; justify-content: space-between; gap: 8px; }
 .mail-time { flex: none; }
 .mail-subj { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+
+/* ===== Mac (et grands écrans) : même app, mise en page sur deux colonnes ===== */
+.desk { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  .desk { display: inline-block; }
+  .row:hover, .song:hover, .mail:hover { background: var(--bg-alt); }
+  .day:hover:not(.on) { border-color: var(--dim); }
+  .icon-btn:hover { background: var(--panel); color: var(--text); }
+  .ghost:hover { border-color: var(--dim); }
+  .check:hover { border-color: var(--accent); }
+  .chips button:hover:not(.on) { border-color: var(--dim); }
+}
+@media (min-width: 860px) {
+  body { padding-bottom: 40px; }
+  .screen { max-width: 1180px; margin: 0 auto; padding: 0 28px; }
+  .sheet { max-width: none; padding-left: max(28px, calc(50% - 380px)); padding-right: max(28px, calc(50% - 380px)); }
+  .top { padding-top: 18px; }
+  .day-top h2 { font-size: 28px; }
+  .days { margin: 0 0 10px; padding: 2px 0 8px; }
+  .day { width: 52px; }
+  .cols { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 36px; align-items: start; }
+  .col-songs { margin-top: -12px; }
+  #pending-filters { margin: 0; padding: 2px 0 6px; flex-wrap: wrap; }
+  .col-day > .section:first-of-type, #agenda-block .section { margin-top: 6px; }
+  /* Fenêtre au centre au lieu de la feuille du bas */
+  .overlay { align-items: center; justify-content: center; }
+  .share-box { width: 440px; border: 1px solid var(--border); border-radius: 18px; padding: 20px; }
+  .toast { bottom: 28px; }
+  .login-box { max-width: 420px; margin: 0 auto; }
+}
