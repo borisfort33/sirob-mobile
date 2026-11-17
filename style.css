@@ -14,7 +14,7 @@
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body { margin: 0; overflow-x: hidden; background: var(--bg); color: var(--text); }
+html, body { margin: 0; overflow-x: clip; background: var(--bg); color: var(--text); }
 body {
   font: 16px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
   min-height: 100vh;

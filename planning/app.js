@@ -17,7 +17,7 @@ const GMAIL = "https://gmail.googleapis.com/gmail/v1/users/me";
 const GSCOPE = "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.readonly";
 const DIGEST_SUBJECT = "Résumé mails SIRØB";
 const REDIRECT = new URL("./", location.href).href;
-const VERSION = "1.2.1";
+const VERSION = "1.2.2";
 const DAYS_BEFORE = 7;
 const DAYS_AFTER = 30;
 
