@@ -32,7 +32,9 @@
         <h2 id="day-title"></h2>
         <p id="day-sub" class="dim"></p>
       </div>
-      <button id="today-btn" class="pill-btn" hidden>Aujourd'hui</button>
+      <button id="prev-btn" class="icon-btn desk" aria-label="Jour précédent" title="Jour précédent (←)">‹</button>
+      <button id="next-btn" class="icon-btn desk" aria-label="Jour suivant" title="Jour suivant (→)">›</button>
+      <button id="today-btn" class="pill-btn" hidden title="Aujourd'hui (T)">Aujourd'hui</button>
       <button id="refresh-btn" class="icon-btn" aria-label="Actualiser">↻</button>
       <button id="mail-btn" class="icon-btn" aria-label="Mes mails">✉︎</button>
       <button id="settings-btn" class="icon-btn" aria-label="Réglages">⚙︎</button>
@@ -40,6 +42,8 @@
     <div id="days" class="days"></div>
     <p id="status" class="status"></p>
 
+    <div class="cols">
+    <div class="col-day">
     <button id="digest-card" class="card digest-card" hidden>
       <span class="digest-icon">☀️</span>
       <span><strong>Ton résumé mails du jour est prêt</strong><br><span class="dim small">Touche pour le lire</span></span>
@@ -57,11 +61,14 @@
 
     <h3 class="section">À faire</h3>
     <form id="add" class="add" autocomplete="off">
-      <input id="add-text" type="text" placeholder="Ajouter une tâche…" enterkeyhint="done">
+      <input id="add-text" type="text" placeholder="Ajouter une tâche…" title="Nouvelle tâche (N)" enterkeyhint="done">
       <input id="add-time" type="time" aria-label="Heure (facultatif)">
       <button class="add-btn" aria-label="Ajouter">+</button>
     </form>
     <ul id="tasks" class="list"></ul>
+    </div>
+
+    <div class="col-songs">
 
     <div id="deadlines-block" hidden>
       <h3 class="section" id="deadlines-title">Deadlines</h3>
@@ -72,6 +79,8 @@
       <h3 class="section"><span id="pending-title">Morceaux en attente</span></h3>
       <div id="pending-filters" class="chips"></div>
       <ul id="pending" class="list"></ul>
+    </div>
+    </div>
     </div>
   </section>
 

@@ -17,7 +17,7 @@ const GMAIL = "https://gmail.googleapis.com/gmail/v1/users/me";
 const GSCOPE = "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.readonly";
 const DIGEST_SUBJECT = "Résumé mails SIRØB";
 const REDIRECT = new URL("./", location.href).href;
-const VERSION = "1.2";
+const VERSION = "1.4";
 const DAYS_BEFORE = 7;
 const DAYS_AFTER = 30;
 
@@ -683,7 +683,8 @@ function renderSongs() {
 
   // Tous les morceaux en attente : affichés sur la journée d'aujourd'hui
   const block = $("pending-block");
-  block.hidden = day !== today || !catalogue;
+  // Sur le Mac (écran large), la liste reste visible quel que soit le jour affiché.
+  block.hidden = (day !== today && !wide()) || !catalogue;
   if (block.hidden) return;
   const rest = songs.filter((s) => !due.includes(s));
   const counts = {};
@@ -724,6 +725,8 @@ function render() {
   renderDigestCard();
   setStatusLine();
 }
+
+const wide = () => window.matchMedia("(min-width: 860px)").matches;
 
 function goDay(k) {
   const min = addDays(todayKey(), -DAYS_BEFORE);
@@ -794,7 +797,7 @@ function openTask(t) {
       save(); updateTask(t.id, { d: k, done: false, from: undefined }); closeSheet();
       toast(`Déplacée à ${relDay(k).toLowerCase() || shortDay(k)}`);
     });
-    body.append(button("Enregistrer", "ghost big", () => { save(); closeSheet(); }));
+    body.append(button("Enregistrer", "ghost big save-btn", () => { save(); closeSheet(); }));
     body.append(button("Supprimer", "ghost danger", () => {
       updateTask(t.id, { del: true }); closeSheet(); toast("Tâche supprimée");
     }));
@@ -1035,6 +1038,32 @@ function wire() {
     $("add-time").value = "";
   });
   $("today-btn").addEventListener("click", () => goDay(todayKey()));
+  $("prev-btn").addEventListener("click", () => goDay(addDays(day, -1)));
+  $("next-btn").addEventListener("click", () => goDay(addDays(day, 1)));
+  window.matchMedia("(min-width: 860px)").addEventListener("change", () => render());
+
+  // Clavier (Mac) : ← → changer de jour, T aujourd'hui, N nouvelle tâche, Échap fermer.
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      if (!$("sheet").hidden) return closeSheet();
+      if (!$("settings").hidden || !$("mails").hidden) return history.back();
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      return;
+    }
+    if (e.key === "Enter" && !$("sheet").hidden && e.target.matches(".field")) {
+      const save = $("sheet-body").querySelector(".save-btn");
+      if (save) { e.preventDefault(); save.click(); }
+      return;
+    }
+    if (e.metaKey || e.ctrlKey || e.altKey || $("main").hidden || !$("sheet").hidden) return;
+    if (e.target.closest("input, textarea, select")) return;
+    if (e.key === "ArrowLeft") goDay(addDays(day, -1));
+    else if (e.key === "ArrowRight") goDay(addDays(day, 1));
+    else if (e.key === "t" || e.key === "T") goDay(todayKey());
+    else if (e.key === "n" || e.key === "N") { e.preventDefault(); $("add-text").focus(); }
+    else return;
+    e.preventDefault();
+  });
   $("refresh-btn").addEventListener("click", () => refreshAll(true));
   $("settings-btn").addEventListener("click", openSettings);
   $("settings-back").addEventListener("click", () => history.back());

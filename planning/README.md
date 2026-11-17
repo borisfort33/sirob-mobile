@@ -89,6 +89,21 @@ est arrivé, une carte ☀️ apparaît en haut d'« Aujourd'hui ».
 Le résumé est un mail que Claude t'envoie chaque matin avec l'objet
 « Résumé mails SIRØB · <date> » ; l'app le retrouve et l'affiche joliment.
 
+## Sur le Mac
+
+C'est la même app, à la même adresse : sur un grand écran elle s'affiche sur deux colonnes (ta
+journée à gauche, les morceaux à droite). Tu vois et modifies exactement les mêmes tâches que sur
+l'iPhone (tout passe par `planning.json` dans OneDrive). Rien à régler chez Microsoft ou Google.
+
+1. Ouvre **Safari** sur https://borisfort33.github.io/sirob-mobile/planning/
+2. Menu **Fichier > Ajouter au Dock…** > **Ajouter**. L'icône Planning apparaît dans le Dock et
+   dans le dossier Applications.
+3. Ouvre **Planning** depuis le Dock > **Se connecter à OneDrive**, puis **Connecter Google
+   Agenda** (et ✉︎ > **Autoriser Gmail** pour les mails).
+
+Raccourcis : **←** / **→** jour précédent / suivant, **T** aujourd'hui, **N** nouvelle tâche,
+**Échap** fermer. Clique une tâche pour la modifier, la déplacer ou la supprimer.
+
 ## Bon à savoir
 
 - **Google** : sa connexion dure 1 h. Ensuite l'app repasse chez Google toute seule, en une
