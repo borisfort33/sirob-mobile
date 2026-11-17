@@ -38,7 +38,8 @@
     </header>
     <div id="tabs" class="seg" role="tablist">
       <button data-tab="songs" class="on">🎧 Morceaux</button>
-      <button data-tab="ideas">💡 Idées de prod</button>
+      <button data-tab="lib">🎵 Playlists</button>
+      <button data-tab="ideas">💡 Idées</button>
     </div>
     <div id="filters" class="chips filters" hidden></div>
     <p id="status" class="status"></p>
@@ -48,6 +49,8 @@
     </div>
     <ul id="live" class="list"></ul>
     <div id="ideas-list" class="notes" hidden></div>
+    <div id="lib-view" class="lib" hidden></div>
+    <button id="lib-new" class="fab lib-fab" aria-label="Nouvelle playlist ou nouveau dossier" hidden>＋</button>
     <button id="idea-new" class="fab" aria-label="Nouvelle idée" hidden>
       <svg viewBox="0 0 24 24" class="ic stroke"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/></svg>
     </button>
@@ -85,6 +88,7 @@
       </div>
     </header>
     <div id="song-prod" class="prod big" hidden></div>
+    <button id="song-add" class="ghost add-pl">＋ Ajouter à une playlist</button>
     <div id="variants" class="chips" hidden></div>
     <h3 class="section">Masters &amp; bounces</h3>
     <ul id="bounces" class="list files"></ul>
@@ -127,6 +131,10 @@
     </div>
   </div>
 
+  <!-- Bibliothèque : choix (créer, ranger, ajouter à une playlist) -->
+  <div id="lib-sheet" class="overlay" hidden>
+    <div class="share-box lib-sheet" id="lib-sheet-box"></div>
+  </div>
   <!-- Téléchargement sur l'iPhone -->
   <div id="dl" class="overlay" hidden>
     <div class="share-box">
@@ -211,6 +219,7 @@
 
   <script src="config.js"></script>
   <script src="app.js"></script>
+  <script src="library.js"></script>
   <script src="ideas.js"></script>
 </body>
 </html>

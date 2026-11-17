@@ -148,19 +148,26 @@ async function syncIdeas() {
 function ideasActive() { return ideaTab; }
 
 function setTab(tab) {
+  if (!["songs", "lib", "ideas"].includes(tab)) tab = "songs";
   ideaTab = tab === "ideas";
-  store.set("tab", ideaTab ? "ideas" : "songs");
-  document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === (ideaTab ? "ideas" : "songs")));
-  $("results").hidden = ideaTab;
-  $("live").hidden = ideaTab;
-  if (ideaTab) $("more").hidden = true;
-  $("filters").hidden = ideaTab || !$("filters").childElementCount;
+  const lib = tab === "lib";
+  store.set("tab", tab);
+  document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
+  $("results").hidden = ideaTab || lib;
+  $("live").hidden = ideaTab || lib;
+  if (ideaTab || lib) $("more").hidden = true;
+  $("filters").hidden = ideaTab || lib || !$("filters").childElementCount;
   $("ideas-list").hidden = !ideaTab;
   $("idea-new").hidden = !ideaTab;
-  $("q").placeholder = ideaTab ? "Chercher une idée, un nom…" : "Titre, artiste, client…";
+  $("lib-view").hidden = !lib;
+  $("lib-new").hidden = !lib;
+  $("q").placeholder = ideaTab ? "Chercher une idée, un nom…" : lib ? "Chercher une playlist, un morceau…" : "Titre, artiste, client…";
   if (ideaTab) {
     renderIdeas();
     syncIdeas();   // à chaque ouverture de l'onglet : on récupère ce que le Mac a écrit
+  } else if (lib) {
+    renderLibrary();
+    syncLibrary();
   } else {
     if (typeof renderFilters === "function") renderFilters();
     render();
@@ -473,5 +480,5 @@ function wireIdeas() {
 }
 
 wireIdeas();
-if (ideaTab) setTab("ideas");
+if (store.get("tab", "songs") !== "songs") setTab(store.get("tab"));
 if (store.get("tok")) syncIdeas();

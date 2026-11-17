@@ -11,7 +11,7 @@ const AUTH = "https://login.microsoftonline.com/consumers/oauth2/v2.0";
 const GRAPH = "https://graph.microsoft.com/v1.0";
 const SCOPE = "Files.ReadWrite offline_access User.Read";
 const REDIRECT = new URL("./", location.href).href;
-const VERSION = "1.6.1";
+const VERSION = "1.7";
 const AUDIO_EXT = /\.(wav|mp3|aif|aiff|flac|m4a)$/i;
 
 const $ = (id) => document.getElementById(id);
@@ -231,6 +231,7 @@ function statusText() {
 }
 function setStatus(text) {
   if (typeof ideasActive === "function" && ideasActive()) return;   // l'onglet Idées a son propre statut
+  if (typeof libActive === "function" && libActive()) return;       // l'onglet Playlists aussi
   $("status").textContent = text;
 }
 
@@ -347,6 +348,7 @@ function bestFile(song) {
 
 function render() {
   if (typeof ideasActive === "function" && ideasActive()) { renderIdeas(); return; }
+  if (typeof libActive === "function" && libActive()) { renderLibrary(); return; }
   const q = $("q").value;
   $("clear").hidden = !q;
   if (offlineView) { renderOffline(); return; }
@@ -575,9 +577,10 @@ async function send(file, title, btn) {
 }
 
 async function shareNative() {
-  const { url, title } = pending;
+  const { url, title, text } = pending;
   try {
-    await navigator.share({ title, text: title, url });
+    // Plusieurs morceaux (playlist) : un seul message avec un lien par export.
+    await navigator.share(pending.multi ? { title, text } : { title, text: title, url });
     closeShare();
   } catch (e) {
     if (e.name !== "AbortError") toast("Partage impossible : " + e.message);
@@ -586,8 +589,8 @@ async function shareNative() {
 
 async function copyLink() {
   try {
-    await navigator.clipboard.writeText(pending.url);
-    toast("Lien copié");
+    await navigator.clipboard.writeText(pending.multi ? pending.text : pending.url);
+    toast(pending.multi ? "Liens copiés" : "Lien copié");
     closeShare();
   } catch {
     prompt("Copie le lien :", pending.url);
@@ -617,8 +620,10 @@ function openMail() {
   $("mail-to").value = "";
   $("mail-subject").value = title;
   const sig = (catalogue && catalogue.signature || "").trim();
-  $("mail-body").value = `Salut,\n\nVoici le lien pour « ${title} » :\n\n${fileLabel(file)} : ${url}`
-    + (sig ? `\n\n-- \n${sig}` : "") + "\n";
+  const lines = pending.multi
+    ? `Voici les liens pour « ${title} » :\n\n` + pending.multi.map((x) => `${x.title} : ${x.url}`).join("\n")
+    : `Voici le lien pour « ${title} » :\n\n${fileLabel(file)} : ${url}`;
+  $("mail-body").value = `Salut,\n\n${lines}` + (sig ? `\n\n-- \n${sig}` : "") + "\n";
   const all = contacts();
   $("mail-contacts").replaceChildren(...all.map((a) => Object.assign(document.createElement("option"), { value: a })));
   const chips = $("mail-chips");

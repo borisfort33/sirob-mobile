@@ -278,3 +278,34 @@ button { cursor: pointer; }
 .embed p { margin: 0 0 6px; }
 .embed iframe { width: 100%; border: 0; border-radius: 12px; background: #000; display: block; }
 .embed iframe.video { aspect-ratio: 16 / 9; height: auto; }
+
+/* --- Playlists (bibliothèque façon Musique, synchronisée avec le Mac) --- */
+.lib-fab { background: var(--accent); color: var(--accent-ink); font-size: 30px; line-height: 1; }
+.lib-art { width: 46px; height: 46px; border-radius: 8px; flex: none; display: grid; place-items: center;
+           color: rgba(255,255,255,.9); font-size: 22px; }
+.lib-art.big { width: 96px; height: 96px; border-radius: 12px; font-size: 44px; box-shadow: 0 8px 22px rgba(0,0,0,.4); }
+.lib-row { gap: 12px; }
+.chev { color: var(--dim); font-size: 22px; padding: 0 2px; }
+.lib-back { background: none; border: 0; color: var(--accent); font-size: 17px; padding: 6px 0 10px; }
+.lib-headwrap { margin: 2px 0 10px; }
+.lib-head { display: flex; align-items: flex-end; gap: 14px; }
+.lib-info { flex: 1; min-width: 0; }
+.lib-info h2 { margin: 0 0 2px; font-size: 24px; line-height: 1.15; overflow-wrap: anywhere; }
+.lib-info p { margin: 0; }
+.lib-more { font-size: 24px; color: var(--accent); }
+.lib-actions { display: flex; gap: 8px; margin-top: 12px; }
+.lib-actions button { flex: 1; padding: 10px 4px; border-radius: 10px; font-weight: 600; font-size: 14px; white-space: nowrap; }
+.lib-actions button.on { background: var(--accent); color: var(--accent-ink); }
+.lib-actions button:disabled, .lib-selbar button:disabled { opacity: .45; }
+.lib-tracks .row.missing .row-title { color: var(--dim); }
+.check { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--dim); background: none;
+         color: var(--accent-ink); flex: none; font-weight: 800; padding: 0; }
+.check.on { background: var(--accent); border-color: var(--accent); }
+.lib-selbar { position: sticky; bottom: calc(var(--safe-bottom) + 76px); display: flex; gap: 8px; padding: 10px 0;
+              background: linear-gradient(transparent, var(--bg) 30%); z-index: 3; }
+.lib-selbar button { padding: 11px 12px; border-radius: 10px; font-weight: 600; white-space: nowrap; }
+.lib-selbar .primary { flex: 1; }
+.lib .empty { white-space: pre-line; }
+.lib-sheet { max-height: 80vh; overflow-y: auto; }
+.lib-sheet .ghost.big { text-align: left; }
+.add-pl { display: block; margin: 4px 0 6px; color: var(--accent); }
