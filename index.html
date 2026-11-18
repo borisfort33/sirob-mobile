@@ -115,6 +115,18 @@
       <p class="dim small">Écrit par l'app du Mac à chaque scan. Par défaut : SIROB Browser/catalogue.json</p>
     </div>
     <div class="card">
+      <label for="cache-max">Écoute rapide</label>
+      <p id="listen-info" class="dim small"></p>
+      <p id="cache-info"></p>
+      <select id="cache-max" class="render-select">
+        <option value="250000000">Cache : 250 Mo</option>
+        <option value="500000000">Cache : 500 Mo</option>
+        <option value="1000000000">Cache : 1 Go</option>
+        <option value="2000000000">Cache : 2 Go</option>
+      </select>
+      <button id="cache-clear" class="ghost">Vider le cache d'écoute</button>
+    </div>
+    <div class="card">
       <p id="account" class="dim"></p>
       <button id="logout" class="ghost danger">Se déconnecter</button>
     </div>

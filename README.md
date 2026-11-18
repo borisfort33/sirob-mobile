@@ -120,3 +120,16 @@ si le Mac est allumé avec SIRØB Project Browser 3.3 ouvert, il lance FL Studio
 20 secondes et range le fichier dans Export (ou Mastering). L'avancement s'affiche dans la fiche
 (`rendus-etat.json`, écrit par le Mac), puis l'export s'écoute directement. Le Mac ne ferme jamais FL Studio
 pour une demande iPhone : s'il est ouvert, la demande attend.
+
+## ⚡ Écoute rapide (1.9)
+
+- **Copies légères** : l'app du Mac (3.8) fait une copie AAC 128 kbps (~1 Mo par minute, au lieu de ~10 pour un WAV)
+  du dernier export de chaque morceau (et du dernier mastering, des exports épinglés dans les playlists, des exports
+  récents de « Prod en cours export »). Toutes dans un seul dossier, `OneDrive/SIROB Browser/Écoute`, jamais dans les
+  dossiers des projets ; une copie périmée (export réenregistré) est supprimée. Le catalogue les indique (champ `e` :
+  chemin de l'export → [chemin de la copie, taille]). L'iPhone lit la copie si elle existe, sinon l'original ;
+  le lecteur plein écran affiche « copie légère ». Les MP3/M4A ne sont pas copiés (déjà légers).
+- **Cache sur l'iPhone** : chaque morceau écouté (copie légère, ou original de 20 Mo max) est gardé dans un cache
+  (Cache API `sirob-ecoute`, 500 Mo par défaut, réglable dans ⚙︎ ; les moins récemment écoutés partent d'abord).
+  La deuxième écoute est instantanée, même sans réseau. « Vider le cache d'écoute » dans ⚙︎.
+  Les fichiers « Sur l'iPhone » (⬇ Télécharger) restent à part.
