@@ -309,3 +309,5 @@ button { cursor: pointer; }
 .lib-sheet { max-height: 80vh; overflow-y: auto; }
 .lib-sheet .ghost.big { text-align: left; }
 .add-pl { display: block; margin: 4px 0 6px; color: var(--accent); }
+.render-select { width: 100%; font: inherit; font-size: 15px; padding: 10px; border-radius: 10px;
+  background: var(--panel); color: inherit; border: 1px solid var(--border); margin-bottom: 4px; }
