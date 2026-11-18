@@ -111,3 +111,12 @@ Mac (2.4), synchronisés dans les deux sens par `OneDrive/SIROB Browser/biblioth
 - ＋ pour créer une playlist ou un dossier ; « ⋯ » pour renommer, ranger, supprimer ;
   « ＋ Ajouter à une playlist » sur la fiche d'un morceau ; ↑ ↓ et Retirer en mode sélection.
 - Les morceaux sont retrouvés grâce au champ `k` du catalogue (écrit par l'app du Mac 2.4).
+
+## ⏺ Rendre sur le Mac (1.8)
+
+Dans la fiche d'un morceau, « ⏺ Rendre sur le Mac » : choisis le .flp (versions, jingles M6, mastering)
+et le format (MP3 320 kbps ou WAV 24 bits). La demande part dans OneDrive (`SIROB Browser/rendus-demandes.json`) ;
+si le Mac est allumé avec SIRØB Project Browser 3.3 ouvert, il lance FL Studio en ligne de commande dans les
+20 secondes et range le fichier dans Export (ou Mastering). L'avancement s'affiche dans la fiche
+(`rendus-etat.json`, écrit par le Mac), puis l'export s'écoute directement. Le Mac ne ferme jamais FL Studio
+pour une demande iPhone : s'il est ouvert, la demande attend.

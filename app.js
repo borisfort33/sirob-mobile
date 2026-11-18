@@ -11,7 +11,7 @@ const AUTH = "https://login.microsoftonline.com/consumers/oauth2/v2.0";
 const GRAPH = "https://graph.microsoft.com/v1.0";
 const SCOPE = "Files.ReadWrite offline_access User.Read";
 const REDIRECT = new URL("./", location.href).href;
-const VERSION = "1.7.2";
+const VERSION = "1.8";
 const AUDIO_EXT = /\.(wav|mp3|aif|aiff|flac|m4a)$/i;
 
 const $ = (id) => document.getElementById(id);
@@ -520,6 +520,7 @@ function openSong(song) {
   }
   fillFiles(song);
   show("song");
+  if (window.onSongOpened) window.onSongOpened();
   $("song").scrollTop = 0;
   history.pushState({ view: "song" }, "");
 }
