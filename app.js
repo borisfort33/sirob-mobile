@@ -11,7 +11,7 @@ const AUTH = "https://login.microsoftonline.com/consumers/oauth2/v2.0";
 const GRAPH = "https://graph.microsoft.com/v1.0";
 const SCOPE = "Files.ReadWrite offline_access User.Read";
 const REDIRECT = new URL("./", location.href).href;
-const VERSION = "1.8";
+const VERSION = "1.9";
 const AUDIO_EXT = /\.(wav|mp3|aif|aiff|flac|m4a)$/i;
 
 const $ = (id) => document.getElementById(id);
@@ -865,7 +865,7 @@ function queueIndex() {
 function fillNow() {
   if (!now) return;
   $("now-title").textContent = now.title || stripExt(now.file.name);
-  $("now-file").textContent = `${now.file.name} · ${parentName(now.file.p) || "OneDrive"}`;
+  $("now-file").textContent = `${now.file.name} · ${parentName(now.file.p) || "OneDrive"}${now.light ? " · copie légère" : ""}`;
   const i = queueIndex();
   $("now-prev").disabled = i <= 0;
   $("now-next").disabled = i < 0 || i >= now.queue.length - 1;
@@ -921,10 +921,12 @@ async function togglePlay(file, queue = [file], title = "") {
     if (local) {
       src = URL.createObjectURL(local.blob);     // copie sur l'iPhone : marche sans réseau
     } else {
-      const item = await graph(itemUrl(file).replace(/:$/, ""));
-      src = item["@microsoft.graph.downloadUrl"];
+      const res = await listenSource(file);
+      src = res.src;
+      if (playing === key && now) now.light = res.light;
     }
     if (playing !== key) return;
+    fillNow();
     if (audio.src.startsWith("blob:")) URL.revokeObjectURL(audio.src);
     audio.src = src;
     $("play-name").textContent = file.name;
@@ -935,6 +937,105 @@ async function togglePlay(file, queue = [file], title = "") {
     $("play-name").textContent = file.name;
     if (e.name !== "AbortError") toast("Lecture impossible : " + e.message);
   }
+}
+
+// --- Écoute rapide : copies légères du Mac + cache sur l'iPhone ----------------------
+// L'app du Mac (3.8) fait une copie AAC 128 kbps (~1 Mo/min au lieu de ~10 pour un WAV) du
+// dernier export de chaque morceau dans « SIROB Browser/Écoute » ; le catalogue dit laquelle
+// (champ « e »). On lit la copie quand elle existe, sinon l'original. Chaque morceau écouté
+// est gardé dans un cache sur l'iPhone (taille limitée, les plus anciens partent d'abord) :
+// la deuxième écoute est instantanée, même sans réseau.
+
+const LISTEN_CACHE = "sirob-ecoute";
+const CACHE_ORIGINAL_MAX = 20e6;        // un WAV de 40 Mo ne va pas dans le cache (2× la 4G)
+const cacheMax = () => store.get("cacheMax", 500e6);
+const cacheUrl = (key) => new URL(`__ecoute/${encodeURIComponent(key)}`, location.href).href;
+
+function lightCopy(file) {
+  const e = catalogue && catalogue.e && file.p && catalogue.e[file.p];
+  return e ? { p: e[0], size: e[1] } : null;
+}
+
+async function cacheGet(key) {
+  try {
+    const c = await caches.open(LISTEN_CACHE);
+    const r = await c.match(cacheUrl(key));
+    if (!r) return null;
+    const idx = store.get("cacheIdx", {});
+    if (idx[key]) { idx[key].t = Date.now(); store.set("cacheIdx", idx); }
+    return await r.blob();
+  } catch { return null; }
+}
+
+async function cachePut(key, blob) {
+  try {
+    const c = await caches.open(LISTEN_CACHE);
+    await c.put(cacheUrl(key), new Response(blob, { headers: { "Content-Type": blob.type } }));
+    const idx = store.get("cacheIdx", {});
+    idx[key] = { s: blob.size, t: Date.now() };
+    // Trop gros : on retire les morceaux écoutés il y a le plus longtemps.
+    let total = Object.values(idx).reduce((n, x) => n + x.s, 0);
+    for (const [k] of Object.entries(idx).sort((a, b) => a[1].t - b[1].t)) {
+      if (total <= cacheMax() || k === key) break;
+      await c.delete(cacheUrl(k));
+      total -= idx[k].s;
+      delete idx[k];
+    }
+    store.set("cacheIdx", idx);
+  } catch { /* iPhone plein : tant pis, on relira en ligne */ }
+}
+
+async function cacheClear() {
+  try { await caches.delete(LISTEN_CACHE); } catch { /* rien */ }
+  store.del("cacheIdx");
+}
+
+const cacheSize = () => Object.values(store.get("cacheIdx", {})).reduce((n, x) => n + x.s, 0);
+
+const caching = new Set();
+function cacheInBackground(key, url, type) {
+  if (caching.has(key)) return;
+  caching.add(key);
+  fetch(url)
+    .then((r) => (r.ok ? r.blob() : null))
+    .then((b) => b && b.size > 1000 && cachePut(key, type ? new Blob([b], { type }) : b))
+    .catch(() => {})
+    .finally(() => caching.delete(key));
+}
+
+/** Adresse à lire : cache de l'iPhone, sinon copie légère, sinon original. */
+async function listenSource(file) {
+  const light = lightCopy(file);
+  if (light) {
+    const hit = await cacheGet(light.p);
+    if (hit) return { src: URL.createObjectURL(hit), light: true };
+    try {
+      const item = await graph(`/me/drive/root:/${encPath(light.p)}`);
+      const url = item["@microsoft.graph.downloadUrl"];
+      cacheInBackground(light.p, url, "audio/mp4");
+      return { src: url, light: true };
+    } catch (e) {
+      if (e instanceof NeedLogin) throw e;
+      // copie supprimée depuis le dernier catalogue : on lit l'original
+    }
+  }
+  const key = fileKey(file);
+  const hit = await cacheGet(key);
+  if (hit) return { src: URL.createObjectURL(hit), light: false };
+  const item = await graph(itemUrl(file).replace(/:$/, ""));
+  const url = item["@microsoft.graph.downloadUrl"];
+  if (item.size && item.size <= CACHE_ORIGINAL_MAX) cacheInBackground(key, url, MIME[ext(file.name)]);
+  return { src: url, light: false };
+}
+
+function fillListenSettings() {
+  const n = Object.keys((catalogue && catalogue.e) || {}).length;
+  $("listen-info").textContent = n
+    ? (n > 1 ? `${n} exports ont une copie légère faite par le Mac : ils se lancent presque tout de suite.`
+             : "1 export a une copie légère faite par le Mac : il se lance presque tout de suite.")
+    : "Pas encore de copies légères : il faut l'app du Mac 3.8 (Réglages › Général).";
+  $("cache-info").textContent = `Morceaux écoutés gardés sur l'iPhone : ${fmtSize(cacheSize())}`;
+  $("cache-max").value = String(cacheMax());
 }
 
 function openNow() {
@@ -1018,6 +1119,7 @@ function openSettings() {
     : "Pas encore de catalogue.";
   $("account").textContent = store.get("account") ? `Connecté : ${store.get("account")}` : "Connecté à OneDrive";
   $("version").textContent = `SIRØB Mobile ${VERSION}`;
+  fillListenSettings();
   show("settings");
   history.pushState({ view: "settings" }, "");
 }
@@ -1058,6 +1160,12 @@ function wire() {
     loadCatalogue(true);
   });
   $("logout").addEventListener("click", logout);
+  $("cache-max").addEventListener("change", (e) => { store.set("cacheMax", Number(e.target.value)); fillListenSettings(); });
+  $("cache-clear").addEventListener("click", async () => {
+    if (!confirm("Vider le cache d'écoute ? (Les fichiers « Sur l'iPhone » restent.)")) return;
+    await cacheClear();
+    fillListenSettings();
+  });
   $("share-native").addEventListener("click", shareNative);
   $("share-mail").addEventListener("click", openMail);
   $("share-copy").addEventListener("click", copyLink);
