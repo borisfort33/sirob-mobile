@@ -12,6 +12,14 @@ Ta journée au même endroit, jour par jour :
 
 Glisse à gauche ou à droite pour changer de jour, ou touche un jour dans la barre.
 
+**Onglet 🎙 Studio** (en bas) : les réservations du **Studio Bella Prod** (l'agenda Google
+rempli par cal.com) sur les 30 prochains jours. En haut, « Libre maintenant » ou « Occupé
+maintenant » et la prochaine réservation ; pour chaque jour réservé, une barre 8 h – minuit
+(rouge = pris, vert = libre) et la liste des créneaux. « Tous les jours » montre aussi les jours
+libres. Touche une réservation pour l'ouvrir dans Google Agenda. L'agenda est trouvé tout seul
+par son nom ; sinon choisis-le dans ⚙︎ > « Agenda du studio ». Il doit apparaître dans ton
+Google Agenda (accepte l'invitation à l'agenda partagé si besoin).
+
 Comme SIRØB Mobile, c'est une web app hébergée sur GitHub Pages, sans serveur ni abonnement :
 
 - les tâches sont enregistrées dans `OneDrive/SIROB Browser/planning.json`. L'iPhone écrit

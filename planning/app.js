@@ -17,9 +17,11 @@ const GMAIL = "https://gmail.googleapis.com/gmail/v1/users/me";
 const GSCOPE = "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.readonly";
 const DIGEST_SUBJECT = "Résumé mails SIRØB";
 const REDIRECT = new URL("./", location.href).href;
-const VERSION = "1.2.2";
+const VERSION = "1.5";
 const DAYS_BEFORE = 7;
 const DAYS_AFTER = 30;
+const STUDIO_NAME = /bella\s*prod/i;   // agenda Google « Studio Bella Prod » (rempli par cal.com)
+const STUDIO_DAYS = 30;
 
 const $ = (id) => document.getElementById(id);
 
@@ -415,10 +417,13 @@ async function loadEvents() {
     const list = (cals.items || []).map((c) => ({ id: c.id, name: c.summaryOverride || c.summary,
       color: c.backgroundColor || "#4aa3ff", primary: !!c.primary }));
     store.set("plan.cals", list);
+    const studio = studioCal(list);
+    store.set("plan.studioId", studio ? studio.id : "");
     const timeMin = dateOf(addDays(todayKey(), -DAYS_BEFORE)).toISOString();
     const timeMax = dateOf(addDays(todayKey(), DAYS_AFTER + 1)).toISOString();
     const items = [];
-    await Promise.all(list.filter((c) => !off.has(c.id)).map(async (c) => {
+    // L'agenda du studio est toujours lu (onglet Studio), même décoché pour « Rendez-vous ».
+    await Promise.all(list.filter((c) => !off.has(c.id) || (studio && c.id === studio.id)).map(async (c) => {
       const data = await gget(`/calendars/${encodeURIComponent(c.id)}/events`, {
         timeMin, timeMax, singleEvents: "true", orderBy: "startTime", maxResults: "250",
       });
@@ -428,6 +433,8 @@ async function loadEvents() {
         items.push({
           id: ev.id, cal: c.id, color: c.color, title: ev.summary || "(sans titre)",
           loc: ev.location || "", link: ev.htmlLink || "", allDay,
+          who: (ev.attendees || []).filter((a) => !a.self && !a.organizer && !a.resource)
+            .map((a) => a.displayName || a.email).filter(Boolean),
           start: allDay ? ev.start.date : ev.start.dateTime,
           end: allDay ? ev.end.date : ev.end.dateTime,
         });
@@ -454,11 +461,20 @@ async function loadEvents() {
   render();
 }
 
-/** Rendez-vous d'un jour (y compris ceux sur plusieurs jours). */
-function eventsOn(key) {
+/** Agenda du studio : celui choisi dans ⚙︎, sinon celui qui s'appelle « … Bella Prod ». */
+function studioCal(list = store.get("plan.cals", [])) {
+  const chosen = store.get("plan.studioCal");
+  return list.find((c) => c.id === chosen) || list.find((c) => STUDIO_NAME.test(c.name || ""));
+}
+
+/** Rendez-vous d'un jour (y compris ceux sur plusieurs jours). Sans « cal » : les agendas
+ *  cochés dans ⚙︎ ; avec « cal » : seulement cet agenda (onglet Studio). */
+function eventsOn(key, cal) {
   const start = dateOf(key);
   const end = dateOf(addDays(key, 1));
+  const off = new Set(store.get("plan.calOff", []));
   return (events.items || []).filter((ev) => {
+    if (cal ? ev.cal !== cal : off.has(ev.cal)) return false;
     const s = ev.allDay ? dateOf(ev.start) : new Date(ev.start);
     const e = ev.allDay ? dateOf(ev.end) : new Date(ev.end);
     return s < end && e > start;
@@ -499,6 +515,20 @@ function el(tag, cls, text) {
 
 function show(id) {
   for (const s of document.querySelectorAll(".screen")) s.hidden = s.id !== id;
+  $("tabbar").hidden = id !== "main" && id !== "studio";
+  for (const b of document.querySelectorAll(".tab")) b.classList.toggle("on", b.dataset.tab === id);
+}
+
+// --- Onglets : Planning / Studio ------------------------------------------------------
+
+let tab = store.get("plan.tab", "main");
+
+function setTab(t) {
+  tab = t === "studio" ? "studio" : "main";
+  store.set("plan.tab", tab);
+  show(tab);
+  window.scrollTo({ top: 0 });
+  if (tab === "studio") renderStudio(); else render();
 }
 
 function showLogin(message) {
@@ -725,6 +755,7 @@ function render() {
   renderSongs();
   renderDigestCard();
   setStatusLine();
+  if (tab === "studio") renderStudio();
 }
 
 function goDay(k) {
@@ -733,6 +764,174 @@ function goDay(k) {
   day = k < min ? min : k > max ? max : k;
   render();
   window.scrollTo({ top: 0 });
+}
+
+// --- Onglet Studio : réservations du studio (agenda Google « Studio Bella Prod ») -----
+// cal.com écrit chaque réservation dans cet agenda Google ; l'app le lit avec le même accès
+// Google que les rendez-vous (lecture seule).
+
+let studioFilter = store.get("plan.studioFilter", "booked");
+
+function studioMessage(text, btnText, onClick) {
+  $("studio-msg").hidden = !text;
+  $("studio-msg-text").textContent = text || "";
+  const b = $("studio-msg-btn");
+  b.hidden = !btnText;
+  b.textContent = btnText || "";
+  b.onclick = onClick || null;
+}
+
+/** Début et fin d'une réservation, coupés à la journée « key ». */
+function clip(ev, key) {
+  const d0 = dateOf(key);
+  const d1 = dateOf(addDays(key, 1));
+  const s = ev.allDay ? dateOf(ev.start) : new Date(ev.start);
+  const e = ev.allDay ? dateOf(ev.end) : new Date(ev.end);
+  return { s: s < d0 ? d0 : s, e: e > d1 ? d1 : e, from: s < d0, to: e > d1 };
+}
+const hours = (d, key) => (d - dateOf(key)) / 3_600_000;
+
+function studioBar(key, list) {
+  // Plage affichée : 8 h – minuit, élargie si une réservation commence plus tôt.
+  let h0 = 8;
+  for (const ev of list) if (!ev.allDay) h0 = Math.min(h0, Math.floor(hours(clip(ev, key).s, key)));
+  const h1 = 24;
+  const pct = (h) => `${((Math.min(Math.max(h, h0), h1) - h0) / (h1 - h0)) * 100}%`;
+  const bar = el("div", "sbar");
+  for (const ev of list) {
+    const c = clip(ev, key);
+    const a = ev.allDay ? h0 : hours(c.s, key);
+    const b = ev.allDay ? h1 : hours(c.e, key);
+    const blk = el("i", "sblk");
+    blk.style.left = pct(a);
+    blk.style.width = `calc(${pct(b)} - ${pct(a)})`;
+    blk.title = ev.title;
+    bar.append(blk);
+  }
+  if (key === todayKey()) {
+    const now = el("i", "snow");
+    now.style.left = pct(hours(new Date(), key));
+    bar.append(now);
+  }
+  const ticks = el("div", "sticks");
+  for (let h = Math.ceil(h0 / 4) * 4; h <= h1; h += 4) {
+    const t = el("span", "", h === 24 ? "24h" : `${h}h`);
+    t.style.left = pct(h);
+    ticks.append(t);
+  }
+  const wrap = el("div", "sbar-wrap");
+  wrap.append(bar, ticks);
+  return wrap;
+}
+
+function studioRow(ev, key) {
+  const li = el("li", "row ev");
+  li.style.setProperty("--c", "var(--accent)");
+  const c = clip(ev, key);
+  const time = el("div", "ev-time");
+  if (ev.allDay || (c.from && c.to)) time.textContent = "Journée";
+  else {
+    time.append(el("span", "", c.from ? "…" : hm(c.s)));
+    time.append(el("span", "dim", c.to ? "…" : hm(c.e)));
+  }
+  const main = el("div", "row-main");
+  main.append(el("div", "row-title wrap", ev.title));
+  const sub = [ev.who && ev.who.length ? `👤 ${ev.who.join(", ")}` : "", ev.loc ? `📍 ${ev.loc}` : ""].filter(Boolean);
+  if (sub.length) main.append(el("div", "row-sub", sub.join(" · ")));
+  li.append(time, main);
+  if (!ev.allDay && new Date(ev.end) < new Date()) li.classList.add("over");
+  if (ev.link) li.addEventListener("click", () => window.open(ev.link, "_blank"));
+  return li;
+}
+
+function renderStudio() {
+  const cal = studioCal();
+  $("studio-title").textContent = cal ? cal.name : "Studio";
+  $("studio-sub").textContent = cal ? `Réservations des ${STUDIO_DAYS} prochains jours` : "";
+  const days = $("studio-days");
+  days.textContent = "";
+  $("studio-now").hidden = true;
+  $("studio-filters").hidden = true;
+  $("studio-status").textContent = "";
+
+  if (!CFG.googleClientId) return studioMessage("Google Agenda n'est pas encore relié (voir le guide, étape 3).");
+  if (!store.get("plan.gcal")) {
+    return studioMessage("Connecte Google Agenda pour voir quand le studio est réservé.",
+      "Connecter Google Agenda", () => googleLogin(false));
+  }
+  if (!cal) {
+    if (!store.get("plan.cals", []).length) return studioMessage("Chargement de tes agendas…");
+    return studioMessage("Je ne trouve pas l'agenda « Studio Bella Prod » dans ton Google Agenda. "
+      + "Accepte l'invitation à cet agenda partagé reçue par mail (ou choisis l'agenda du studio dans ⚙︎), puis touche ↻.",
+      "Choisir l'agenda dans ⚙︎", openSettings);
+  }
+  if (gcalState === "expired") {
+    studioMessage("Google demande de confirmer la connexion pour actualiser les réservations.",
+      "Confirmer", () => googleLogin(false));
+  } else studioMessage("");
+
+  const today = todayKey();
+  const all = [];
+  for (let i = 0; i < STUDIO_DAYS; i++) {
+    const k = addDays(today, i);
+    all.push({ k, list: eventsOn(k, cal.id) });
+  }
+
+  // Maintenant : occupé ou libre, et prochaine réservation
+  const now = new Date();
+  const cur = all[0].list.find((ev) => {
+    const c = clip(ev, today);
+    return c.s <= now && c.e > now;
+  });
+  const next = all.flatMap((d) => d.list.map((ev) => ({ ev, k: d.k })))
+    .map(({ ev, k }) => ({ ev, k, s: clip(ev, k).s }))
+    .find((x) => x.s > now);
+  const box = $("studio-now");
+  box.textContent = "";
+  box.className = "studio-now card " + (cur ? "busy" : "free");
+  if (cur) {
+    const c = clip(cur, today);
+    box.append(el("strong", "", "● Occupé maintenant"),
+      el("span", "dim small", cur.allDay || c.to ? `${cur.title} · toute la journée` : `${cur.title} · jusqu'à ${hm(c.e)}`));
+  } else {
+    box.append(el("strong", "", "● Libre maintenant"),
+      el("span", "dim small", next
+        ? `Prochaine réservation : ${(relDay(next.k) || shortDay(next.k)).toLowerCase()}${next.ev.allDay ? " (toute la journée)" : ` à ${hm(next.s)}`}`
+        : `Aucune réservation dans les ${STUDIO_DAYS} prochains jours`));
+  }
+  box.hidden = false;
+
+  // Filtre : jours réservés / tous les jours
+  const booked = all.filter((d) => d.list.length);
+  const chips = $("studio-filters");
+  chips.textContent = "";
+  for (const [k, label] of [["booked", `Réservés ${booked.length}`], ["all", `Tous les jours ${STUDIO_DAYS}`]]) {
+    const b = el("button", k === studioFilter ? "on" : "", label);
+    b.addEventListener("click", () => { studioFilter = k; store.set("plan.studioFilter", k); renderStudio(); });
+    chips.append(b);
+  }
+  chips.hidden = false;
+
+  const shown = studioFilter === "all" ? all : booked;
+  for (const { k, list } of shown) {
+    const card = el("div", "sday" + (k === today ? " today" : "") + (list.length ? "" : " free"));
+    const head = el("div", "sday-head");
+    const rel = relDay(k);
+    head.append(el("span", "sday-name", ((rel ? rel + " · " : "") + fmtDay(k, { weekday: "short", day: "numeric", month: "short" })).replace(/^./, (c) => c.toUpperCase())));
+    const allDay = list.some((ev) => ev.allDay || (clip(ev, k).from && clip(ev, k).to));
+    head.append(el("span", "sday-state", !list.length ? "Libre"
+      : allDay ? "Pris toute la journée" : `${list.length} réservation${list.length > 1 ? "s" : ""}`));
+    card.append(head);
+    if (list.length) {
+      card.append(studioBar(k, list));
+      const ul = el("ul", "list");
+      for (const ev of list) ul.append(studioRow(ev, k));
+      card.append(ul);
+    }
+    days.append(card);
+  }
+  if (!shown.length) days.append(el("p", "empty", `Aucune réservation dans les ${STUDIO_DAYS} prochains jours : le studio est libre.`));
+  if (events.at) $("studio-status").textContent = `Mis à jour ${ago(events.at / 1000)}`;
 }
 
 // --- Feuilles d'actions -------------------------------------------------------------
@@ -1020,6 +1219,18 @@ function openSettings() {
       list.append(lab);
     }
   }
+  const sel = $("studio-cal");
+  sel.textContent = "";
+  const cals = store.get("plan.cals", []);
+  $("studio-card").hidden = !connected || !cals.length;
+  const cur = studioCal(cals);
+  if (!cur) sel.append(el("option", "", "Choisis l'agenda du studio…"));
+  for (const c of cals) {
+    const o = el("option", "", c.name);
+    o.value = c.id;
+    o.selected = !!cur && cur.id === c.id;
+    sel.append(o);
+  }
   show("settings");
   history.pushState({ view: "settings" }, "");
 }
@@ -1040,7 +1251,14 @@ function wire() {
   $("refresh-btn").addEventListener("click", () => refreshAll(true));
   $("settings-btn").addEventListener("click", openSettings);
   $("settings-back").addEventListener("click", () => history.back());
-  window.addEventListener("popstate", () => { show("main"); render(); });
+  window.addEventListener("popstate", () => { show(tab); render(); });
+  for (const b of document.querySelectorAll(".tab")) b.addEventListener("click", () => setTab(b.dataset.tab));
+  $("studio-refresh").addEventListener("click", () => refreshAll(true));
+  $("studio-cal").addEventListener("change", (e) => {
+    if (!e.target.value) return;
+    store.set("plan.studioCal", e.target.value);
+    loadEvents();
+  });
   $("cat-path").addEventListener("change", (e) => {
     const v = e.target.value.trim().replace(/^\/+/, "");
     store.set("catPath", v || CFG.catalogue);
@@ -1072,6 +1290,7 @@ function wire() {
   const main = $("main");
   main.addEventListener("touchstart", (e) => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
   main.addEventListener("touchend", (e) => {
+    if (tab !== "main") return;
     if (e.target.closest("#days, .chips, input")) return;
     const dx = e.changedTouches[0].clientX - sx;
     const dy = e.changedTouches[0].clientY - sy;
@@ -1114,7 +1333,7 @@ async function start() {
     return showLogin(e.message);
   }
   if (!store.get("tok")) return showLogin();
-  show("main");
+  show(tab);
   if (rollOver()) changed(); else render();
   rememberAccount();
   refreshAll();
