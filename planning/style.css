@@ -298,3 +298,18 @@ button { cursor: pointer; }
 .sticks span:last-child { transform: translateX(-100%); }
 .sday .list .row:last-child { border-bottom: 0; }
 .field.select { width: 100%; -webkit-appearance: none; appearance: none; }
+
+/* Ghost Production */
+.ghost-card { display: flex; flex-direction: column; gap: 8px; width: 100%; text-align: left; color: var(--text);
+              font: inherit; margin: 4px 0 10px; border-color: #3b3550; background: linear-gradient(90deg, #221f2c, var(--panel)); }
+.ghost-card.alert { border-color: #6b3030; background: linear-gradient(90deg, #2c1d1d, var(--panel)); }
+.ghost-card-head { display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 15px; }
+.ghost-sum { display: flex; flex-direction: column; gap: 6px; }
+.gline { display: flex; flex-direction: column; gap: 1px; }
+.gline strong { font-size: 14px; }
+.gline.late strong { color: #ffc048; }
+.gline.ok strong { color: #4cd964; font-weight: 600; }
+.gline .small { overflow-wrap: anywhere; }
+#ghost-add #ghost-add-day { flex: none; width: 136px; color: var(--dim); }
+.row-sub.late-ev { color: var(--danger); font-weight: 600; margin: 0 0 2px; }
+.sday-state.g { color: var(--dim) !important; font-weight: 400 !important; }

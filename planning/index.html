@@ -45,6 +45,11 @@
       <span><strong>Ton résumé mails du jour est prêt</strong><br><span class="dim small">Touche pour le lire</span></span>
     </button>
 
+    <button id="ghost-card" class="card ghost-card" hidden>
+      <span class="ghost-card-head"><span>👻 Ghost Production</span><span class="chev">›</span></span>
+      <span id="ghost-card-body" class="ghost-sum"></span>
+    </button>
+
     <div id="gcal-banner" class="card banner" hidden>
       <p id="gcal-text"></p>
       <button id="gcal-btn" class="ghost">Connecter Google Agenda</button>
@@ -53,6 +58,11 @@
     <div id="agenda-block">
       <h3 class="section">Rendez-vous</h3>
       <ul id="events" class="list"></ul>
+    </div>
+
+    <div id="rappels-block" hidden>
+      <h3 class="section">⏰ Rappels</h3>
+      <ul id="rappels" class="list"></ul>
     </div>
 
     <h3 class="section">À faire</h3>
@@ -94,10 +104,45 @@
     <p id="studio-status" class="status"></p>
   </section>
 
+  <!-- Ghost Production (agenda Google « Ghost Production » + rappels) -->
+  <section id="ghost" class="screen" hidden>
+    <header class="top day-top">
+      <div class="song-head">
+        <h2 id="ghost-title">Ghost Production</h2>
+        <p id="ghost-sub" class="dim"></p>
+      </div>
+      <button id="ghost-refresh" class="icon-btn" aria-label="Actualiser">↻</button>
+    </header>
+    <div id="ghost-msg" class="card banner" hidden>
+      <p id="ghost-msg-text"></p>
+      <button id="ghost-msg-btn" class="ghost" hidden></button>
+    </div>
+
+    <h3 class="section">⏰ Rappels</h3>
+    <form id="ghost-add" class="add" autocomplete="off">
+      <input id="ghost-add-text" type="text" placeholder="Ajouter un rappel…" enterkeyhint="done">
+      <input id="ghost-add-day" type="date" aria-label="Prévu le (facultatif)">
+      <button class="add-btn" aria-label="Ajouter">+</button>
+    </form>
+    <ul id="ghost-rappels" class="list"></ul>
+
+    <div id="ghost-late-block" hidden>
+      <h3 class="section">🔴 En retard</h3>
+      <ul id="ghost-late" class="list"></ul>
+    </div>
+
+    <div id="ghost-up-block" hidden>
+      <h3 class="section">À venir</h3>
+      <div id="ghost-days"></div>
+    </div>
+    <p id="ghost-status" class="status"></p>
+  </section>
+
   <!-- Onglets -->
   <nav id="tabbar" class="tabbar" hidden>
     <button data-tab="main" class="tab on"><span class="tab-ic">📅</span>Planning</button>
     <button data-tab="studio" class="tab"><span class="tab-ic">🎙</span>Studio</button>
+    <button data-tab="ghost" class="tab"><span class="tab-ic">👻</span>Ghost</button>
   </nav>
 
   <!-- Mails -->
@@ -136,6 +181,11 @@
       <label for="studio-cal"><strong>Agenda du studio</strong> (onglet Studio)</label>
       <select id="studio-cal" class="field select"></select>
       <p class="dim small">Les réservations cal.com arrivent dans cet agenda Google. Décoche-le plus haut si tu ne veux pas les voir aussi dans « Rendez-vous ».</p>
+    </div>
+    <div class="card" id="ghost-set" hidden>
+      <label for="ghost-cal"><strong>Agenda Ghost Production</strong> (onglet Ghost)</label>
+      <select id="ghost-cal" class="field select"></select>
+      <p class="dim small">Écris « retard » dans un rendez-vous pour qu'il ressorte en rouge. Un rendez-vous « Rappel : … » devient un rappel qui se reporte chaque jour jusqu'à ce que tu le coches.</p>
     </div>
     <div class="card">
       <p id="cat-info"></p>

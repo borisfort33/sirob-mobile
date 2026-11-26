@@ -17,11 +17,16 @@ const GMAIL = "https://gmail.googleapis.com/gmail/v1/users/me";
 const GSCOPE = "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.readonly";
 const DIGEST_SUBJECT = "Résumé mails SIRØB";
 const REDIRECT = new URL("./", location.href).href;
-const VERSION = "1.5";
+const VERSION = "1.6";
 const DAYS_BEFORE = 7;
 const DAYS_AFTER = 30;
 const STUDIO_NAME = /bella\s*prod/i;   // agenda Google « Studio Bella Prod » (rempli par cal.com)
 const STUDIO_DAYS = 30;
+const GHOST_NAME = /ghost/i;            // agenda Google « Ghost Production »
+const GHOST_DAYS = 30;
+// Un rendez-vous « Rappel : … » de l'agenda Ghost devient un rappel dans l'app (voir importRappels).
+const RAPPEL_RE = /^\s*(?:⏰\s*)?rappel\s*[:\-–—]\s*/i;
+const LATE_RE = /retard/i;               // « en retard » écrit dans le titre ou la note d'un rendez-vous
 
 const $ = (id) => document.getElementById(id);
 
@@ -202,7 +207,8 @@ async function rememberAccount() {
 
 // --- Tâches : planning.json dans OneDrive ----------------------------------------------
 // Chaque tâche : {id, t: texte, d: "AAAA-MM-JJ", h: "HH:MM" | "", done, song?, c: créée, u: modifiée, del?,
-//                 from?: jour prévu à l'origine quand la tâche a été reportée}
+//                 from?: jour prévu à l'origine quand la tâche a été reportée,
+//                 r?: 1 pour un rappel (liste Rappels), gev?: rendez-vous « Rappel : … » d'où il vient}
 // Fusion par tâche (la plus récemment modifiée gagne) : iPhone, iPad et Mac peuvent écrire
 // le même fichier sans s'écraser.
 
@@ -226,6 +232,7 @@ function keepPlan() {
 }
 
 let syncing = null;
+let planReady = false;   // planning.json lu au moins une fois : on peut importer les rappels sans doublon
 let saveTimer = null;
 
 function changed() {
@@ -256,6 +263,7 @@ async function doSync(attempt = 0) {
     } catch (e) {
       if (e.status !== 404) throw e;
     }
+    planReady = true;
     if (remote) {
       plan = { ...remote, tasks: mergeTasks(plan.tasks || [], remote.tasks || []) };
       planETag = etag;
@@ -265,6 +273,7 @@ async function doSync(attempt = 0) {
     } else if (etag === null) {
       planETag = null;   // pas encore de fichier : on le crée
     }
+    if (importRappels()) { rollOver(); store.set("plan.dirty", true); keepPlan(); render(); }
     if (!store.get("plan.dirty") && etag !== null) return;
     if (!store.get("plan.dirty") && !(plan.tasks || []).length) return;
     plan.updated = new Date().toISOString();
@@ -292,10 +301,11 @@ async function doSync(attempt = 0) {
 const liveTasks = () => (plan.tasks || []).filter((t) => !t.del);
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
-function addTask(text, day, h = "", song) {
+function addTask(text, day, h = "", song, rappel = false) {
   const now = Date.now();
   const t = { id: newId(), t: text, d: day, h, done: false, c: now, u: now };
   if (song) t.song = song;
+  if (rappel) t.r = 1;
   plan.tasks = [...(plan.tasks || []), t];
   changed();
   return t;
@@ -313,6 +323,30 @@ function rollOver() {
     n++;
     return { ...t, from: t.from || t.d, d: today, u: now };
   });
+  return n;
+}
+
+/** Rappels dictés à Claude : un rendez-vous « Rappel : texte » dans l'agenda Ghost Production
+ *  (au jour où le travail était prévu) devient une fois pour toutes un rappel dans planning.json,
+ *  qui se reporte ensuite chaque jour jusqu'à ce qu'il soit coché. Renvoie le nombre importé. */
+function importRappels() {
+  const g = ghostCal();
+  if (!g || !planReady) return 0;
+  const have = new Set((plan.tasks || []).map((t) => t.id));
+  let n = 0;
+  for (const ev of events.items || []) {
+    if (ev.cal !== g.id || !RAPPEL_RE.test(ev.title)) continue;
+    const id = "g-" + ev.id;
+    if (have.has(id)) continue;
+    const s = ev.allDay ? null : new Date(ev.start);
+    const u = Date.parse(ev.created || "") || Date.now();
+    const t = { id, t: ev.title.replace(RAPPEL_RE, "").trim() || ev.title, d: s ? keyOf(s) : ev.start,
+      h: s ? hm(s) : "", done: false, r: 1, gev: ev.id, c: u, u };
+    if (ev.desc) t.note = ev.desc.replace(/<[^>]+>/g, " ").trim().slice(0, 300);
+    plan.tasks = [...(plan.tasks || []), t];
+    have.add(id);
+    n++;
+  }
   return n;
 }
 
@@ -419,11 +453,15 @@ async function loadEvents() {
     store.set("plan.cals", list);
     const studio = studioCal(list);
     store.set("plan.studioId", studio ? studio.id : "");
+    const ghost = ghostCal(list);
+    store.set("plan.ghostId", ghost ? ghost.id : "");
     const timeMin = dateOf(addDays(todayKey(), -DAYS_BEFORE)).toISOString();
     const timeMax = dateOf(addDays(todayKey(), DAYS_AFTER + 1)).toISOString();
     const items = [];
-    // L'agenda du studio est toujours lu (onglet Studio), même décoché pour « Rendez-vous ».
-    await Promise.all(list.filter((c) => !off.has(c.id) || (studio && c.id === studio.id)).map(async (c) => {
+    // Les agendas du studio et de Ghost Production sont toujours lus (leurs onglets),
+    // même décochés pour « Rendez-vous ».
+    const always = (c) => (studio && c.id === studio.id) || (ghost && c.id === ghost.id);
+    await Promise.all(list.filter((c) => !off.has(c.id) || always(c)).map(async (c) => {
       const data = await gget(`/calendars/${encodeURIComponent(c.id)}/events`, {
         timeMin, timeMax, singleEvents: "true", orderBy: "startTime", maxResults: "250",
       });
@@ -433,6 +471,7 @@ async function loadEvents() {
         items.push({
           id: ev.id, cal: c.id, color: c.color, title: ev.summary || "(sans titre)",
           loc: ev.location || "", link: ev.htmlLink || "", allDay,
+          desc: ev.description || "", created: ev.created || "",
           who: (ev.attendees || []).filter((a) => !a.self && !a.organizer && !a.resource)
             .map((a) => a.displayName || a.email).filter(Boolean),
           start: allDay ? ev.start.date : ev.start.dateTime,
@@ -443,6 +482,7 @@ async function loadEvents() {
     events = { items, at: Date.now() };
     store.set("plan.events", events);
     gcalState = "ok";
+    if (importRappels()) { rollOver(); changed(); }
   } catch (e) {
     if (e.expired) {
       gcalState = "expired";
@@ -467,6 +507,14 @@ function studioCal(list = store.get("plan.cals", [])) {
   return list.find((c) => c.id === chosen) || list.find((c) => STUDIO_NAME.test(c.name || ""));
 }
 
+/** Agenda Ghost Production : celui choisi dans ⚙︎, sinon celui qui s'appelle « Ghost … ». */
+function ghostCal(list = store.get("plan.cals", [])) {
+  const chosen = store.get("plan.ghostCal");
+  return list.find((c) => c.id === chosen) || list.find((c) => GHOST_NAME.test(c.name || ""));
+}
+const isRappelEv = (ev) => RAPPEL_RE.test(ev.title) && ev.cal === store.get("plan.ghostId");
+const isLate = (ev) => LATE_RE.test(ev.title) || LATE_RE.test(ev.desc || "");
+
 /** Rendez-vous d'un jour (y compris ceux sur plusieurs jours). Sans « cal » : les agendas
  *  cochés dans ⚙︎ ; avec « cal » : seulement cet agenda (onglet Studio). */
 function eventsOn(key, cal) {
@@ -474,7 +522,7 @@ function eventsOn(key, cal) {
   const end = dateOf(addDays(key, 1));
   const off = new Set(store.get("plan.calOff", []));
   return (events.items || []).filter((ev) => {
-    if (cal ? ev.cal !== cal : off.has(ev.cal)) return false;
+    if (cal ? ev.cal !== cal : off.has(ev.cal) || isRappelEv(ev)) return false;
     const s = ev.allDay ? dateOf(ev.start) : new Date(ev.start);
     const e = ev.allDay ? dateOf(ev.end) : new Date(ev.end);
     return s < end && e > start;
@@ -515,20 +563,20 @@ function el(tag, cls, text) {
 
 function show(id) {
   for (const s of document.querySelectorAll(".screen")) s.hidden = s.id !== id;
-  $("tabbar").hidden = id !== "main" && id !== "studio";
+  $("tabbar").hidden = !["main", "studio", "ghost"].includes(id);
   for (const b of document.querySelectorAll(".tab")) b.classList.toggle("on", b.dataset.tab === id);
 }
 
-// --- Onglets : Planning / Studio ------------------------------------------------------
+// --- Onglets : Planning / Studio / Ghost ------------------------------------------------------
 
 let tab = store.get("plan.tab", "main");
 
 function setTab(t) {
-  tab = t === "studio" ? "studio" : "main";
+  tab = ["studio", "ghost"].includes(t) ? t : "main";
   store.set("plan.tab", tab);
   show(tab);
   window.scrollTo({ top: 0 });
-  if (tab === "studio") renderStudio(); else render();
+  if (tab === "studio") renderStudio(); else if (tab === "ghost") renderGhost(); else render();
 }
 
 function showLogin(message) {
@@ -650,6 +698,7 @@ function taskRow(t, carried) {
   if (t.h) title.append(el("span", "task-time", t.h));
   title.append(document.createTextNode((t.song ? "🎛 " : "") + t.t));
   main.append(title);
+  if (t.note) main.append(el("div", "row-sub", t.note));
   const since = t.from && t.from < t.d ? t.from : carried ? t.d : null;
   if (since && !t.done) {
     const n = Math.round((dateOf(todayKey()) - dateOf(since)) / 86_400_000);
@@ -665,11 +714,11 @@ function taskRow(t, carried) {
   return li;
 }
 
-function renderTasks() {
-  const ul = $("tasks");
+/** Tâches (ou rappels) d'un jour : d'abord les reportées, puis celles du jour. */
+function renderTaskList(ul, rappels, emptyText) {
   ul.textContent = "";
   const today = todayKey();
-  const all = liveTasks();
+  const all = liveTasks().filter((t) => !!t.r === rappels);
   const rolled = (t) => !t.done && t.from && t.from < t.d;
   const mine = all.filter((t) => t.d === day && !rolled(t));
   // Reportées en haut (les plus anciennes d'abord) ; « d < today » couvre une tâche pas encore reportée.
@@ -680,7 +729,14 @@ function renderTasks() {
   mine.sort(order);
   for (const t of carried) ul.append(taskRow(t, true));
   for (const t of mine) ul.append(taskRow(t, false));
-  if (!carried.length && !mine.length) ul.append(el("li", "empty", day < today ? "Rien de noté ce jour-là." : "Rien pour l'instant."));
+  const n = carried.length + mine.length;
+  if (!n && emptyText) ul.append(el("li", "empty", emptyText));
+  return n;
+}
+
+function renderTasks() {
+  renderTaskList($("tasks"), false, day < todayKey() ? "Rien de noté ce jour-là." : "Rien pour l'instant.");
+  $("rappels-block").hidden = !renderTaskList($("rappels"), true);
 }
 
 function songRow(s, planned) {
@@ -754,8 +810,10 @@ function render() {
   renderTasks();
   renderSongs();
   renderDigestCard();
+  renderGhostCard();
   setStatusLine();
   if (tab === "studio") renderStudio();
+  if (tab === "ghost") renderGhost();
 }
 
 function goDay(k) {
@@ -934,6 +992,165 @@ function renderStudio() {
   if (events.at) $("studio-status").textContent = `Mis à jour ${ago(events.at / 1000)}`;
 }
 
+// --- Onglet Ghost Production : agenda Google « Ghost Production » + rappels -----------
+
+/** Ce qu'il faut voir d'un coup d'œil (carte sur Planning et en haut de l'onglet Ghost). */
+function ghostSummary() {
+  const today = todayKey();
+  const cal = ghostCal();
+  const now = new Date();
+  const open = liveTasks().filter((t) => t.r && !t.done);
+  const lateR = open.filter((t) => (t.from || t.d) < today).sort((a, b) => (a.from || a.d).localeCompare(b.from || b.d));
+  const todayR = open.filter((t) => t.d === today && !((t.from || t.d) < today));
+  const evs = cal ? (events.items || []).filter((ev) => ev.cal === cal.id && !RAPPEL_RE.test(ev.title)) : [];
+  const endOf = (ev) => (ev.allDay ? dateOf(ev.end) : new Date(ev.end));
+  const startOf = (ev) => (ev.allDay ? dateOf(ev.start) : new Date(ev.start));
+  const lateEv = evs.filter(isLate).filter((ev) => endOf(ev) > dateOf(addDays(today, -DAYS_BEFORE)))
+    .sort((a, b) => startOf(a) - startOf(b));
+  const todayEv = cal ? eventsOn(today, cal.id).filter((ev) => !RAPPEL_RE.test(ev.title)) : [];
+  const next = evs.filter((ev) => startOf(ev) > now && keyOf(startOf(ev)) !== today).sort((a, b) => startOf(a) - startOf(b))[0];
+  const since = (k) => {
+    const n = Math.round((dateOf(today) - dateOf(k)) / 86_400_000);
+    return n === 1 ? "depuis hier" : `depuis ${n} j`;
+  };
+  const when = (ev) => {
+    const s = startOf(ev);
+    const k = ev.allDay ? ev.start : keyOf(s);
+    return (relDay(k) || shortDay(k)).toLowerCase() + (ev.allDay ? "" : ` ${hm(s)}`);
+  };
+  const lines = [];
+  if (lateR.length) lines.push(["late", `⚠️ ${lateR.length} rappel${lateR.length > 1 ? "s" : ""} en retard`,
+    lateR.slice(0, 3).map((t) => `${t.t} (${since(t.from || t.d)})`).join(" · ") + (lateR.length > 3 ? " …" : "")]);
+  if (lateEv.length) lines.push(["late", `🔴 ${lateEv.length} en retard dans l'agenda`,
+    lateEv.slice(0, 3).map((ev) => ev.title).join(" · ")]);
+  if (todayR.length) lines.push(["", `⏰ ${todayR.length} rappel${todayR.length > 1 ? "s" : ""} aujourd'hui`,
+    todayR.slice(0, 3).map((t) => t.t).join(" · ")]);
+  if (todayEv.length) lines.push(["", "👻 Aujourd'hui", todayEv.map((ev) => (ev.allDay ? "" : hm(startOf(ev)) + " ") + ev.title).join(" · ")]);
+  if (next) lines.push(["", "Prochain", `${next.title} · ${when(next)}`]);
+  return { cal, lines, any: !!(lateR.length || lateEv.length || todayR.length || todayEv.length) };
+}
+
+function summaryBox(box, sum) {
+  box.textContent = "";
+  for (const [cls, head, sub] of sum.lines) {
+    const line = el("div", "gline" + (cls ? " " + cls : ""));
+    line.append(el("strong", "", head));
+    if (sub) line.append(el("span", "dim small", sub));
+    box.append(line);
+  }
+  if (!sum.lines.length) {
+    const line = el("div", "gline ok");
+    line.append(el("strong", "", "Rien en retard 👌"));
+    box.append(line);
+  }
+}
+
+function renderGhostCard() {
+  const card = $("ghost-card");
+  const sum = ghostSummary();
+  card.hidden = day !== todayKey() || (!sum.cal && !liveTasks().some((t) => t.r));
+  if (card.hidden) return;
+  const body = $("ghost-card-body");
+  summaryBox(body, sum);
+  card.classList.toggle("alert", sum.lines.some((l) => l[0] === "late"));
+}
+
+function ghostMessage(text, btnText, onClick) {
+  $("ghost-msg").hidden = !text;
+  $("ghost-msg-text").textContent = text || "";
+  const b = $("ghost-msg-btn");
+  b.hidden = !btnText;
+  b.textContent = btnText || "";
+  b.onclick = onClick || null;
+}
+
+function ghostRow(ev, key) {
+  const li = studioRow(ev, key);
+  li.style.setProperty("--c", isLate(ev) ? "var(--danger)" : ev.color || "var(--accent)");
+  if (isLate(ev)) {
+    li.classList.remove("over");   // un retard reste bien visible même passé
+    li.querySelector(".row-main").prepend(el("div", "row-sub late-ev", "🔴 En retard"));
+  }
+  return li;
+}
+
+function renderGhost() {
+  const cal = ghostCal();
+  const today = todayKey();
+  $("ghost-title").textContent = cal ? cal.name : "Ghost Production";
+  $("ghost-sub").textContent = cal ? `Rappels et ${GHOST_DAYS} prochains jours` : "Rappels";
+  $("ghost-status").textContent = "";
+
+  // Rappels : tous ceux pas cochés (les plus en retard d'abord), puis ceux cochés aujourd'hui.
+  const ul = $("ghost-rappels");
+  ul.textContent = "";
+  const all = liveTasks().filter((t) => t.r);
+  const open = all.filter((t) => !t.done)
+    .sort((a, b) => (a.from || a.d).localeCompare(b.from || b.d) || a.d.localeCompare(b.d) || a.c - b.c);
+  const doneToday = all.filter((t) => t.done && t.u && keyOf(new Date(t.u)) === today);
+  for (const t of open) ul.append(taskRow(t, (t.from || t.d) < today));
+  for (const t of doneToday) ul.append(taskRow(t, false));
+  if (!open.length && !doneToday.length) ul.append(el("li", "empty", "Aucun rappel. Dis à Claude « fais un rappel » ou ajoute-le ici."));
+
+  const lateBox = $("ghost-late");
+  const upcoming = $("ghost-days");
+  lateBox.textContent = "";
+  upcoming.textContent = "";
+  $("ghost-late-block").hidden = true;
+  $("ghost-up-block").hidden = true;
+
+  if (!CFG.googleClientId) return ghostMessage("Google Agenda n'est pas encore relié (voir le guide, étape 3).");
+  if (!store.get("plan.gcal")) {
+    return ghostMessage("Connecte Google Agenda pour voir ton agenda Ghost Production.",
+      "Connecter Google Agenda", () => googleLogin(false));
+  }
+  if (!cal) {
+    if (!store.get("plan.cals", []).length) return ghostMessage("Chargement de tes agendas…");
+    return ghostMessage("Je ne trouve pas l'agenda « Ghost Production ». Crée-le dans Google Agenda "
+      + "(sur ordinateur : calendar.google.com > « Autres agendas » > + > « Créer un agenda »), puis touche ↻. "
+      + "Tes rappels marchent déjà sans lui.", "Choisir l'agenda dans ⚙︎", openSettings);
+  }
+  if (gcalState === "expired") {
+    ghostMessage("Google demande de confirmer la connexion pour actualiser l'agenda.", "Confirmer", () => googleLogin(false));
+  } else ghostMessage("");
+
+  // En retard : rendez-vous où tu as écrit « retard » (titre ou note), des 7 derniers jours à venir.
+  const seen = new Set();
+  for (let i = -DAYS_BEFORE; i < GHOST_DAYS; i++) {
+    const k = addDays(today, i);
+    for (const ev of eventsOn(k, cal.id)) {
+      if (RAPPEL_RE.test(ev.title) || !isLate(ev) || seen.has(ev.id)) continue;
+      seen.add(ev.id);
+      const li = ghostRow(ev, k);
+      li.querySelector(".row-sub.late-ev").textContent = `🔴 En retard · ${(relDay(k) || shortDay(k)).toLowerCase()}`;
+      lateBox.append(li);
+    }
+  }
+  $("ghost-late-block").hidden = !seen.size;
+
+  // À venir : les jours avec quelque chose dans l'agenda Ghost
+  let n = 0;
+  for (let i = 0; i < GHOST_DAYS; i++) {
+    const k = addDays(today, i);
+    const list = eventsOn(k, cal.id).filter((ev) => !RAPPEL_RE.test(ev.title));
+    if (!list.length) continue;
+    n++;
+    const card = el("div", "sday" + (k === today ? " today" : ""));
+    const head = el("div", "sday-head");
+    const rel = relDay(k);
+    head.append(el("span", "sday-name", ((rel ? rel + " · " : "") + fmtDay(k, { weekday: "short", day: "numeric", month: "short" })).replace(/^./, (c) => c.toUpperCase())));
+    head.append(el("span", "sday-state g", `${list.length} élément${list.length > 1 ? "s" : ""}`));
+    card.append(head);
+    const l = el("ul", "list");
+    for (const ev of list) l.append(ghostRow(ev, k));
+    card.append(l);
+    upcoming.append(card);
+  }
+  $("ghost-up-block").hidden = false;
+  if (!n) upcoming.append(el("p", "empty", `Rien dans l'agenda Ghost Production pour les ${GHOST_DAYS} prochains jours.`));
+  if (events.at) $("ghost-status").textContent = `Mis à jour ${ago(events.at / 1000)}`;
+}
+
 // --- Feuilles d'actions -------------------------------------------------------------
 
 function openSheet(title, sub, build) {
@@ -973,7 +1190,7 @@ function dayChoices(body, current, onPick) {
 }
 
 function openTask(t) {
-  openSheet(t.song ? "Morceau à travailler" : "Tâche", !t.done && (t.from || t.d) < todayKey() ? `Prévue ${shortDay(t.from || t.d)} · reportée jusqu'à ce que tu la coches` : "", (body) => {
+  openSheet(t.song ? "Morceau à travailler" : t.r ? "Rappel" : "Tâche", !t.done && (t.from || t.d) < todayKey() ? `Prévue ${shortDay(t.from || t.d)} · reportée jusqu'à ce que tu la coches` : "", (body) => {
     const text = el("input", "field");
     text.type = "text";
     text.value = t.t;
@@ -1223,6 +1440,7 @@ function openSettings() {
   sel.textContent = "";
   const cals = store.get("plan.cals", []);
   $("studio-card").hidden = !connected || !cals.length;
+  $("ghost-set").hidden = !connected || !cals.length;
   const cur = studioCal(cals);
   if (!cur) sel.append(el("option", "", "Choisis l'agenda du studio…"));
   for (const c of cals) {
@@ -1230,6 +1448,16 @@ function openSettings() {
     o.value = c.id;
     o.selected = !!cur && cur.id === c.id;
     sel.append(o);
+  }
+  const gsel = $("ghost-cal");
+  gsel.textContent = "";
+  const gcur = ghostCal(cals);
+  if (!gcur) gsel.append(el("option", "", "Choisis l'agenda Ghost Production…"));
+  for (const c of cals) {
+    const o = el("option", "", c.name);
+    o.value = c.id;
+    o.selected = !!gcur && gcur.id === c.id;
+    gsel.append(o);
   }
   show("settings");
   history.pushState({ view: "settings" }, "");
@@ -1258,6 +1486,24 @@ function wire() {
     if (!e.target.value) return;
     store.set("plan.studioCal", e.target.value);
     loadEvents();
+  });
+  $("ghost-cal").addEventListener("change", (e) => {
+    if (!e.target.value) return;
+    store.set("plan.ghostCal", e.target.value);
+    loadEvents();
+  });
+  $("ghost-refresh").addEventListener("click", () => refreshAll(true));
+  $("ghost-card").addEventListener("click", () => setTab("ghost"));
+  $("ghost-add").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const v = $("ghost-add-text").value.trim();
+    if (!v) return;
+    const k = $("ghost-add-day").value || todayKey();
+    addTask(v, k, "", undefined, true);
+    if (k < todayKey() && rollOver()) changed();
+    $("ghost-add-text").value = "";
+    $("ghost-add-day").value = "";
+    toast(k < todayKey() ? `Rappel ajouté (prévu ${shortDay(k)}, reporté à aujourd'hui)` : "Rappel ajouté");
   });
   $("cat-path").addEventListener("change", (e) => {
     const v = e.target.value.trim().replace(/^\/+/, "");
