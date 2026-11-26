@@ -148,21 +148,29 @@ async function syncIdeas() {
 function ideasActive() { return ideaTab; }
 
 function setTab(tab) {
-  if (!["songs", "lib", "ideas"].includes(tab)) tab = "songs";
+  if (!["songs", "lib", "ideas", "brief"].includes(tab)) tab = "songs";
   ideaTab = tab === "ideas";
   const lib = tab === "lib";
+  const brief = tab === "brief";
+  const other = ideaTab || lib || brief;
   store.set("tab", tab);
   document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
-  $("results").hidden = ideaTab || lib;
-  $("live").hidden = ideaTab || lib;
-  if (ideaTab || lib) $("more").hidden = true;
-  $("filters").hidden = ideaTab || lib || !$("filters").childElementCount;
+  $("results").hidden = other;
+  $("live").hidden = other;
+  if (other) $("more").hidden = true;
+  $("filters").hidden = other || !$("filters").childElementCount;
   $("ideas-list").hidden = !ideaTab;
   $("idea-new").hidden = !ideaTab;
   $("lib-view").hidden = !lib;
   $("lib-new").hidden = !lib;
-  $("q").placeholder = ideaTab ? "Chercher une idée, un nom…" : lib ? "Chercher une playlist, un morceau…" : "Titre, artiste, client…";
-  if (ideaTab) {
+  $("brief-list").hidden = !brief;
+  $("brief-new").hidden = !brief;
+  $("q").placeholder = ideaTab ? "Chercher une idée, un nom…" : lib ? "Chercher une playlist, un morceau…"
+    : brief ? "Chercher un briefing, un artiste…" : "Titre, artiste, client…";
+  if (brief) {
+    renderBriefs();
+    syncBriefs();
+  } else if (ideaTab) {
     renderIdeas();
     syncIdeas();   // à chaque ouverture de l'onglet : on récupère ce que le Mac a écrit
   } else if (lib) {
@@ -260,21 +268,7 @@ function fillIdeaMeta(it) {
   $("idea-pin").classList.toggle("on", !!it.p);
   $("idea-done").classList.toggle("on", !!it.k);
   const box = $("idea-links");
-  box.replaceChildren();
-  for (const url of ideaLinks(it)) {
-    const [icon, label] = linkKind(url);
-    const playable = !!embedFor(url) || isShazam(url);
-    const row = el("div", "link-row");
-    const b = el("button", "link-btn", `${playable ? "▶" : icon}  ${label}`);
-    b.addEventListener("click", () => (playable ? playLink(url, row) : window.open(url, "_blank")));
-    const open = el("button", "link-open", "↗");
-    open.setAttribute("aria-label", "Ouvrir dans l'app");
-    open.addEventListener("click", () => window.open(url, "_blank"));
-    const top = el("div", "link-top");
-    top.append(b, open);
-    row.append(top);
-    box.append(row);
-  }
+  fillLinks(box, ideaLinks(it), () => $("idea-text").value);
   $("idea-links-title").hidden = !box.childElementCount;
 }
 
@@ -397,10 +391,43 @@ async function shazamEmbed(url, context) {
 }
 
 function closeEmbed() {
-  document.querySelectorAll("#idea-links .embed").forEach((n) => n.remove());
+  document.querySelectorAll(".links .embed").forEach((n) => n.remove());
 }
 
-async function playLink(url, row) {
+/** Spotify : « spotify:track:ID » ouvre directement l'app Spotify (écoute complète). */
+function spotifyUri(url) {
+  const m = url.match(/open\.spotify\.com\/(?:intl-[a-z]+\/)?(track|album|playlist|episode|artist|show)\/([A-Za-z0-9]+)/);
+  return m ? `spotify:${m[1]}:${m[2]}` : null;
+}
+
+/** Ouvre le lien dans l'app qui va bien (Spotify, YouTube…), sinon dans Safari. */
+function openInApp(url) {
+  const uri = spotifyUri(url);
+  if (uri) { window.location.href = uri; return; }
+  window.open(url, "_blank");
+}
+
+/** Boutons « ▶ Écouter » + « ↗ » (ouvrir dans l'app) des liens d'une note. */
+function fillLinks(box, links, contextFn) {
+  box.replaceChildren();
+  for (const url of links) {
+    const [icon, label] = linkKind(url);
+    const playable = !!embedFor(url) || isShazam(url);
+    const row = el("div", "link-row");
+    const b = el("button", "link-btn", `${playable ? "▶" : icon}  ${label}`);
+    b.addEventListener("click", () => (playable ? playLink(url, row, contextFn()) : openInApp(url)));
+    const spotify = !!spotifyUri(url) || /spotify\.link|spoti\.fi/i.test(url);
+    const open = el("button", "link-open" + (spotify ? " wide" : ""), spotify ? "↗ App" : "↗");
+    open.setAttribute("aria-label", spotify ? "Ouvrir dans l'app Spotify" : "Ouvrir dans l'app");
+    open.addEventListener("click", () => openInApp(url));
+    const top = el("div", "link-top");
+    top.append(b, open);
+    row.append(top);
+    box.append(row);
+  }
+}
+
+async function playLink(url, row, context) {
   const already = row.querySelector(".embed");
   closeEmbed();
   if (already) return;          // 2e appui : on ferme le lecteur
@@ -410,7 +437,7 @@ async function playLink(url, row) {
   if (isShazam(url)) {
     holder.append(el("p", "dim small", "Recherche du morceau…"));
     try {
-      const found = await shazamEmbed(url, $("idea-text").value);
+      const found = await shazamEmbed(url, context != null ? context : $("idea-text").value);
       if (!found) throw new Error("introuvable");
       [src, height, title] = [found.src, 175, found.title];
     } catch {
@@ -472,6 +499,7 @@ function wireIdeas() {
     fillIdeaMeta(getIdea(currentIdea));
   });
   window.addEventListener("popstate", () => { if (currentIdea && $("idea").hidden) closeIdea(); });
+  // (les onglets sont branchés ici une seule fois, y compris « Briefs »)
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) { flushIdea(); if (ideasDirty) syncIdeas(); return; }
     if (store.get("tok") && (ideasDirty || nowMs() - store.get("ideasAt", 0) > 30_000)) syncIdeas();
@@ -480,5 +508,5 @@ function wireIdeas() {
 }
 
 wireIdeas();
-if (store.get("tab", "songs") !== "songs") setTab(store.get("tab"));
 if (store.get("tok")) syncIdeas();
+// L'onglet mémorisé est rouvert par briefings.js (chargé après), qui connaît tous les onglets.

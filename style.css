@@ -311,3 +311,24 @@ button { cursor: pointer; }
 .add-pl { display: block; margin: 4px 0 6px; color: var(--accent); }
 .render-select { width: 100%; font: inherit; font-size: 15px; padding: 10px; border-radius: 10px;
   background: var(--panel); color: inherit; border: 1px solid var(--border); margin-bottom: 4px; }
+
+/* --- Briefings Ghost Production (classés par artiste / client) --- */
+.brief-person { display: flex; align-items: center; gap: 6px; margin: 14px 2px 6px; }
+.brief-name { flex: 1; display: flex; align-items: baseline; gap: 8px; background: none; border: 0; padding: 4px 2px;
+              color: var(--text); font-size: 19px; font-weight: 700; text-align: left; min-width: 0; }
+.brief-name > span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brief-chev { color: var(--notes); width: 14px; flex: none; font-size: 17px; }
+.brief-count { color: var(--dim); font-size: 13px; font-weight: 500; margin-left: auto; flex: none; }
+.brief-add { background: var(--notes-card); color: var(--notes); border: 0; border-radius: 50%; width: 32px; height: 32px;
+             font-size: 18px; flex: none; }
+.note.brief { display: flex; align-items: flex-start; gap: 12px; }
+.brief-body { flex: 1; min-width: 0; }
+.brief-check { width: 24px; height: 24px; margin-top: 1px; border-radius: 50%; border: 2px solid var(--dim); background: none;
+               color: #1c1c1e; font-weight: 800; font-size: 13px; padding: 0; flex: none; }
+.brief-check.on { background: var(--notes); border-color: var(--notes); }
+.note.brief.done .note-sub { text-decoration: line-through; opacity: .6; }
+.done-btn { border: 0; border-radius: 14px; padding: 5px 11px; font-size: 15px; font-weight: 600; background: none; }
+.done-btn.on { background: var(--notes); color: #1c1c1e; opacity: 1; }
+.idea-text.done { text-decoration: line-through; color: var(--dim); }
+.link-open.wide { width: auto; padding: 0 12px; font-size: 15px; font-weight: 600; }
+.seg button { white-space: nowrap; }

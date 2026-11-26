@@ -40,6 +40,7 @@
       <button data-tab="songs" class="on">🎧 Morceaux</button>
       <button data-tab="lib">🎵 Playlists</button>
       <button data-tab="ideas">💡 Idées</button>
+      <button data-tab="brief">👻 Briefs</button>
     </div>
     <div id="filters" class="chips filters" hidden></div>
     <p id="status" class="status"></p>
@@ -49,11 +50,37 @@
     </div>
     <ul id="live" class="list"></ul>
     <div id="ideas-list" class="notes" hidden></div>
+    <div id="brief-list" class="notes briefs" hidden></div>
     <div id="lib-view" class="lib" hidden></div>
     <button id="lib-new" class="fab lib-fab" aria-label="Nouvelle playlist ou nouveau dossier" hidden>＋</button>
     <button id="idea-new" class="fab" aria-label="Nouvelle idée" hidden>
       <svg viewBox="0 0 24 24" class="ic stroke"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/></svg>
     </button>
+    <button id="brief-new" class="fab" aria-label="Nouveau briefing" hidden>
+      <svg viewBox="0 0 24 24" class="ic stroke"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/></svg>
+    </button>
+  </section>
+
+  <!-- Briefing Ghost Production -->
+  <section id="brief" class="screen sheet notes-sheet" hidden>
+    <header class="top">
+      <button id="brief-back" class="icon-btn back notes-back" aria-label="Retour">‹ <span>Briefs</span></button>
+      <span class="spacer"></span>
+      <button id="brief-pin" class="icon-btn tool" aria-label="Épingler">📌</button>
+      <button id="brief-done" class="tool done-btn" aria-label="Fait">Fait ?</button>
+      <button id="brief-delete" class="icon-btn tool" aria-label="Supprimer">🗑</button>
+    </header>
+    <p id="brief-date" class="dim small center"></p>
+    <div class="idea-from">
+      <label for="brief-person">Artiste / client</label>
+      <input id="brief-person" type="text" list="brief-people" autocomplete="off" autocapitalize="words"
+             placeholder="Pour qui ?">
+      <datalist id="brief-people"></datalist>
+    </div>
+    <h3 class="section" id="brief-links-title" hidden>Écouter</h3>
+    <div id="brief-links" class="links"></div>
+    <textarea id="brief-text" class="idea-text" placeholder="Titre du briefing&#10;Ce que veut l'artiste, références, colle les liens YouTube, Spotify…"></textarea>
+    <button id="brief-paste" class="ghost paste">📋 Coller un lien</button>
   </section>
 
   <!-- Idée de prod (façon Notes) -->
@@ -236,6 +263,7 @@
   <script src="app.js"></script>
   <script src="library.js"></script>
   <script src="ideas.js"></script>
+  <script src="briefings.js"></script>
   <script src="render.js"></script>
 </body>
 </html>
