@@ -20,6 +20,22 @@ libres. Touche une réservation pour l'ouvrir dans Google Agenda. L'agenda est t
 par son nom ; sinon choisis-le dans ⚙︎ > « Agenda du studio ». Il doit apparaître dans ton
 Google Agenda (accepte l'invitation à l'agenda partagé si besoin).
 
+**Onglet 👻 Ghost** : l'agenda Google **Ghost Production** (trouvé par son nom, ou choisi dans
+⚙︎ > « Agenda Ghost Production ») et tes **rappels**.
+
+- **Rappels** : un rappel se reporte chaque jour, comme une tâche, jusqu'à ce que tu le coches
+  (« ↻ Reportée · prévue … »). Tu peux en ajouter dans l'onglet (avec le jour où c'était prévu),
+  ou demander à Claude « fais un rappel » : il crée dans l'agenda Ghost Production un rendez-vous
+  « Rappel : … » au jour prévu, et l'app le transforme une fois pour toutes en rappel
+  (il n'apparaît pas en double dans « Rendez-vous »). Les rappels s'affichent aussi sur la
+  journée, dans « ⏰ Rappels », au-dessus de « À faire ».
+- **En retard** : écris « retard » dans le titre ou la note d'un rendez-vous Ghost, il ressort en rouge.
+- **À venir** : les 30 prochains jours de l'agenda Ghost Production.
+
+Sur la page Planning (aujourd'hui), une carte **👻 Ghost Production** résume l'essentiel :
+rappels en retard (et depuis combien de jours), rendez-vous marqués en retard, rappels et
+rendez-vous du jour, prochain rendez-vous. Touche-la pour ouvrir l'onglet Ghost.
+
 Comme SIRØB Mobile, c'est une web app hébergée sur GitHub Pages, sans serveur ni abonnement :
 
 - les tâches sont enregistrées dans `OneDrive/SIROB Browser/planning.json`. L'iPhone écrit
