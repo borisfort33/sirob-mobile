@@ -256,3 +256,45 @@ button { cursor: pointer; }
 .mail-top { display: flex; justify-content: space-between; gap: 8px; }
 .mail-time { flex: none; }
 .mail-subj { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+
+/* Onglets (Planning / Studio) */
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 4;
+  display: flex; justify-content: center; gap: 8px;
+  padding: 8px 16px calc(var(--safe-bottom) + 8px);
+  background: rgba(22, 24, 29, .92); border-top: 1px solid var(--border);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+}
+.tab { flex: 1; max-width: 220px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+       background: none; border: 0; border-radius: 12px; padding: 5px 0 3px; color: var(--dim);
+       font-size: 12px; font-weight: 600; }
+.tab-ic { font-size: 20px; line-height: 1.1; filter: grayscale(1); opacity: .7; }
+.tab.on { color: var(--accent); }
+.tab.on .tab-ic { filter: none; opacity: 1; }
+
+/* Studio */
+.studio-now { display: flex; flex-direction: column; gap: 3px; margin: 4px 0 10px; }
+.studio-now strong { font-size: 16px; }
+.studio-now.free strong { color: #4cd964; }
+.studio-now.busy strong { color: var(--danger); }
+#studio-filters { margin: 0 -16px; padding: 2px 16px 6px; }
+#studio-filters button { font-size: 13px; padding: 5px 11px; }
+.sday { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 12px 12px 4px; margin: 10px 0; }
+.sday.today { border-color: #6b4a22; }
+.sday.free { padding: 10px 12px; margin: 6px 0; background: none; }
+.sday-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.sday-name { font-weight: 700; }
+.sday.today .sday-name { color: var(--accent); }
+.sday-state { font-size: 13px; color: var(--dim); flex: none; }
+.sday:not(.free) .sday-state { color: var(--danger); font-weight: 600; }
+.sday.free .sday-state { color: #4cd964; }
+.sbar-wrap { margin: 10px 0 4px; }
+.sbar { position: relative; height: 14px; border-radius: 7px; background: #24402c; overflow: hidden; }
+.sblk { position: absolute; top: 0; bottom: 0; background: var(--danger); border-radius: 3px; min-width: 3px; }
+.snow { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--text); }
+.sticks { position: relative; height: 16px; font-size: 10px; color: var(--dim); }
+.sticks span { position: absolute; top: 2px; transform: translateX(-50%); }
+.sticks span:first-child { transform: none; }
+.sticks span:last-child { transform: translateX(-100%); }
+.sday .list .row:last-child { border-bottom: 0; }
+.field.select { width: 100%; -webkit-appearance: none; appearance: none; }

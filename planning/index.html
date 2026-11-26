@@ -75,6 +75,31 @@
     </div>
   </section>
 
+  <!-- Studio Bella Prod (agenda Google rempli par cal.com) -->
+  <section id="studio" class="screen" hidden>
+    <header class="top day-top">
+      <div class="song-head">
+        <h2 id="studio-title">Studio</h2>
+        <p id="studio-sub" class="dim"></p>
+      </div>
+      <button id="studio-refresh" class="icon-btn" aria-label="Actualiser">↻</button>
+    </header>
+    <div id="studio-msg" class="card banner" hidden>
+      <p id="studio-msg-text"></p>
+      <button id="studio-msg-btn" class="ghost" hidden></button>
+    </div>
+    <div id="studio-now" class="studio-now" hidden></div>
+    <div id="studio-filters" class="chips"></div>
+    <div id="studio-days"></div>
+    <p id="studio-status" class="status"></p>
+  </section>
+
+  <!-- Onglets -->
+  <nav id="tabbar" class="tabbar" hidden>
+    <button data-tab="main" class="tab on"><span class="tab-ic">📅</span>Planning</button>
+    <button data-tab="studio" class="tab"><span class="tab-ic">🎙</span>Studio</button>
+  </nav>
+
   <!-- Mails -->
   <section id="mails" class="screen sheet" hidden>
     <header class="top">
@@ -106,6 +131,11 @@
       <p id="gcal-info" class="dim small"></p>
       <div id="cal-list" class="cal-list"></div>
       <button id="gcal-toggle" class="ghost"></button>
+    </div>
+    <div class="card" id="studio-card" hidden>
+      <label for="studio-cal"><strong>Agenda du studio</strong> (onglet Studio)</label>
+      <select id="studio-cal" class="field select"></select>
+      <p class="dim small">Les réservations cal.com arrivent dans cet agenda Google. Décoche-le plus haut si tu ne veux pas les voir aussi dans « Rendez-vous ».</p>
     </div>
     <div class="card">
       <p id="cat-info"></p>
